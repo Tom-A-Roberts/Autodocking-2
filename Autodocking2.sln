@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30204.135
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Autodocking 2", "Autodocking 2\Autodocking 2.csproj", "{1878AD66-3119-4933-A2C1-5009F4688FCD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1878AD66-3119-4933-A2C1-5009F4688FCD}.Debug|x64.ActiveCfg = Debug|x64
+		{1878AD66-3119-4933-A2C1-5009F4688FCD}.Debug|x64.Build.0 = Debug|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {53C8E487-E44C-4BD3-8198-E5CBDAFCE88B}
+	EndGlobalSection
+EndGlobal
