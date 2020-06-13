@@ -165,7 +165,7 @@ namespace IngameScript
             scriptEnabled = true;
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
             systemsAnalyzer.myConnector = beginConnector;
-            shipIOHandler.OutputHomeLocations();
+            OutputHomeLocations();
         }
 
         public string updateHomeLocation(string argument, IMyShipConnector my_connected_connector)
@@ -276,6 +276,27 @@ namespace IngameScript
                 }
             }
         }
+
+
+        void OutputHomeLocations()
+        {
+            Echo("\n   Home location Data:");
+            foreach (HomeLocation currentHomeLocation in homeLocations)
+            {
+                Echo("Station conn: " + currentHomeLocation.station_connector_name);
+                IMyShipConnector my_connector = (IMyShipConnector)GridTerminalSystem.GetBlockWithId(currentHomeLocation.my_connector_ID);
+                Echo("Ship conn: " + my_connector.CustomName);
+                string argStr = "ARGS: ";
+                foreach (string arg in currentHomeLocation.arguments)
+                {
+                    argStr += arg + ", ";
+                }
+                Echo(argStr + "\n");
+
+            }
+        }
+
+
 
         /// <summary>
         /// Equivalent to "Update()" from Unity but specifically for the docking sequence.
