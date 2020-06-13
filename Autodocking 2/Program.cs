@@ -10,38 +10,45 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
 
-        // https://github.com/malware-dev/MDK-SE/wiki/Quick-Introduction-to-Space-Engineers-Ingame-Scripts
+        // CHANGEABLE VARIABLES:
 
-        const double updatesPerSecond = 10;
+        const double updatesPerSecond = 10;             // Defines how many times the script performes it's calculations per second.
 
-        
-        string current_argument;
 
-        List<Vector3D> shipForwardLocal = new List<Vector3D>();
-        List<Vector3D> shipUpwardLocal = new List<Vector3D>();
 
+        // DO NOT CHANGE BELOW THIS LINE \/ \/ \/
+
+        // Script systems:
         ShipSystemsAnalyzer systemsAnalyzer;
+        //ShipSystemsController systemsController;
         IOHandler shipIOHandler;
 
 
-
+        // Script States:
+        string current_argument;
         bool errorState = false;
-        static bool scriptEnabled = false;
+        bool scriptEnabled = false;
         //string persistantText = "";
+        double timeElapsed = 0;
+        List<HomeLocation> homeLocations = new List<HomeLocation>();
 
+
+        // Ship vector math variables:
+        List<Vector3D> shipForwardLocal = new List<Vector3D>();
+        List<Vector3D> shipUpwardLocal = new List<Vector3D>();
         double angleRoll = 0;
         double anglePitch = 0;
-
-        const double proportionalConstant = 2;
-        const double derivativeConstant = .5;
-        const double timeLimit = 1 / updatesPerSecond;
-        double timeElapsed = 0;
-
         PID pitchPID;
         PID rollPID;
 
-        List<HomeLocation> homeLocations = new List<HomeLocation>();
 
+        // Script constants:
+        const double proportionalConstant = 2;
+        const double derivativeConstant = .5;
+        const double timeLimit = 1 / updatesPerSecond;
+
+        // Thanks to:
+        // https://github.com/malware-dev/MDK-SE/wiki/Quick-Introduction-to-Space-Engineers-Ingame-Scripts
 
         public Program()
         {
@@ -51,6 +58,7 @@ namespace IngameScript
             systemsAnalyzer = new ShipSystemsAnalyzer(this);
             shipIOHandler = new IOHandler(this);
 
+
             pitchPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
             rollPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
 
@@ -59,25 +67,9 @@ namespace IngameScript
             SafelyExit();
         }
 
-        void OutputHomeLocations()
-        {
-            shipIOHandler.Echo("\n   Home location Data:");
-            foreach (HomeLocation currentHomeLocation in homeLocations)
-            {
-                shipIOHandler.Echo("Station conn: " + currentHomeLocation.station_connector_name);
-                IMyShipConnector my_connector = (IMyShipConnector)GridTerminalSystem.GetBlockWithId(currentHomeLocation.my_connector_ID);
-                shipIOHandler.Echo("Ship conn: " + my_connector.CustomName);
-                string argStr = "ARGS: ";
-                foreach (string arg in currentHomeLocation.arguments)
-                {
-                    argStr += arg + ", ";
-                }
-                shipIOHandler.Echo(argStr + "\n");
 
-            }
-        }
 
-        //Yeah thanks a lot, Whip.
+        //Help from Whip.
         void AlignWithGravity()
         {
             IMyShipConnector referenceBlock = systemsAnalyzer.myConnector;
@@ -110,8 +102,8 @@ namespace IngameScript
 
             anglePitch = Math.Acos(MathHelper.Clamp(gravityVec.Dot(referenceForward) / gravityVecLength, -1, 1)) - Math.PI / 2;
             Vector3D planetRelativeLeftVec = referenceForward.Cross(gravityVec);
-            angleRoll = VectorAngleBetween(referenceLeft, planetRelativeLeftVec);
-            angleRoll *= VectorCompareDirection(VectorProjection(referenceLeft, gravityVec), gravityVec); //ccw is positive 
+            angleRoll = PID.VectorAngleBetween(referenceLeft, planetRelativeLeftVec);
+            angleRoll *= PID.VectorCompareDirection(PID.VectorProjection(referenceLeft, gravityVec), gravityVec); //ccw is positive 
 
             anglePitch *= -1;
             angleRoll *= -1;
@@ -137,11 +129,6 @@ namespace IngameScript
             }
         }
 
-        
-
-
-
-
         void ApplyGyroOverride(double pitch_speed, double yaw_speed, double roll_speed, List<IMyGyro> gyro_list, MatrixD b_WorldMatrix)
         {
             var rotationVec = new Vector3D(-pitch_speed, yaw_speed, roll_speed); //because keen does some weird stuff with signs 
@@ -159,19 +146,26 @@ namespace IngameScript
             }
         }
 
+
         public void Save()
         {
 
         }
 
-        public void Begin(IMyShipConnector beginConnector, string argument)
+        /// <summary>
+        /// Begins the ship docking sequence. Requires (Will require) a HomeLocation and argument.
+        /// </summary>
+        /// <param name="beginConnector"></param>
+        /// <param name="argument"></param>
+        public void Begin(IMyShipConnector beginConnector, string argument) // WARNING, NEED TO ADD HOME LOCATION IN FUTURE INSTEAD
         {
             //persistantText = "";
+            shipIOHandler.DockingSequenceStartMessage(argument);
             current_argument = argument;
             scriptEnabled = true;
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
             systemsAnalyzer.myConnector = beginConnector;
-            OutputHomeLocations();
+            shipIOHandler.OutputHomeLocations();
         }
 
         public string updateHomeLocation(string argument, IMyShipConnector my_connected_connector)
@@ -246,37 +240,15 @@ namespace IngameScript
                     var my_connected_connector = systemsAnalyzer.FindMyConnectedConnector();
                     if (my_connected_connector == null)
                     {
-                        if (scriptEnabled)
+                        if (scriptEnabled && argument == current_argument)
                         {
-                            if (argument == current_argument)
-                            {
-                                shipIOHandler.Echo("STOPPED\nAwaiting orders, Your Grace");
-                                SafelyExit();
-                            }
-                            else
-                            {
-                                if (argument == "")
-                                {
-                                    shipIOHandler.Echo("RUNNING\nRe-starting docking sequence\nwith no argument.");
-                                }
-                                else
-                                {
-                                    shipIOHandler.Echo("RUNNING\nRe-starting docking sequence\nwith new argument: " + argument);
-                                }
-                                Begin(systemsAnalyzer.myConnector, argument);
-                            }
+                            // Script was already running, and using current argument, therefore this is a stopping order.
+                            shipIOHandler.Echo("STOPPED\nAwaiting orders, Your Grace");
+                            SafelyExit();
                         }
                         else
                         {
-                            if (argument == "")
-                            {
-                                shipIOHandler.Echo("RUNNING\nAttempting docking sequence\nwith no argument.");
-                            }
-                            else
-                            {
-                                shipIOHandler.Echo("RUNNING\nAttempting docking sequence\nwith argument: " + argument);
-                            }
-
+                            // Request to dock initialized.
                             Begin(systemsAnalyzer.myConnector, argument);
                         }
                     }
@@ -291,30 +263,31 @@ namespace IngameScript
                 shipIOHandler.EchoFinish(false);
             }
 
+            // Script docking is running:
             if (scriptEnabled && !errorState)
             {
                 timeElapsed += Runtime.TimeSinceLastRun.TotalSeconds;
-
                 if (timeElapsed >= timeLimit)
                 {
-
                     systemsAnalyzer.CheckForMassChange();
-
-                    AlignWithGravity();
-                    var velocity = systemsAnalyzer.cockpit.GetShipVelocities().LinearVelocity;
-                    //shipIOHandler.Echo (velocity);
-                    float m = 0;
-                    SetResultantAcceleration(-(float)velocity.X * m, -(float)velocity.Y * m, -(float)velocity.Z * m);
+                    // Do docking sequence:
+                    DockingSequenceFrameUpdate();
                     timeElapsed = 0;
                 }
             }
-
         }
 
-        void MoveToPoint(float precision, Vector3D WorldPosition)
+        /// <summary>
+        /// Equivalent to "Update()" from Unity but specifically for the docking sequence.
+        /// </summary>
+        void DockingSequenceFrameUpdate()
         {
-
+                AlignWithGravity();
+                var velocity = systemsAnalyzer.cockpit.GetShipVelocities().LinearVelocity;
+                float m = 0;
+                SetResultantAcceleration(-(float)velocity.X * m, -(float)velocity.Y * m, -(float)velocity.Z * m);
         }
+
 
         void SetResultantAcceleration(float xForce, float yForce, float zForce)
         {
@@ -324,6 +297,12 @@ namespace IngameScript
             var ForceToApply = (new Vector3D(xForce, yForce, zForce) - CurrentFeltForce) * systemsAnalyzer.shipMass;
 
             //shipIOHandler.Echo ("Force to apply: " + ForceToApply.Length ().ToString ("0,0"));
+
+
+
+
+
+
 
             IMyShipConnector referenceBlock = systemsAnalyzer.myConnector;
             var referenceOrigin = referenceBlock.GetPosition();
@@ -405,7 +384,7 @@ namespace IngameScript
             };
 
             var ans = new double[] { ForceToApply.X, ForceToApply.Y, ForceToApply.Z };
-            ComputeCoefficients(mat, ans);
+            PID.ComputeCoefficients(mat, ans);
 
             // shipIOHandler.Echo (ans[0].ToString ());
             // shipIOHandler.Echo (ans[1].ToString ());
@@ -436,44 +415,7 @@ namespace IngameScript
 
         }
 
-        public void ComputeCoefficients(double[,] X, double[] Y)
-        {
-            int I, J, K, K1, N;
-            N = Y.Length;
-            for (K = 0; K < N; K++)
-            {
-                K1 = K + 1;
-                for (I = K; I < N; I++)
-                {
-                    if (X[I, K] != 0)
-                    {
-                        for (J = K1; J < N; J++)
-                        {
-                            X[I, J] /= X[I, K];
-                        }
-                        Y[I] /= X[I, K];
-                    }
-                }
-                for (I = K1; I < N; I++)
-                {
-                    if (X[I, K] != 0)
-                    {
-                        for (J = K1; J < N; J++)
-                        {
-                            X[I, J] -= X[K, J];
-                        }
-                        Y[I] -= Y[K];
-                    }
-                }
-            }
-            for (I = N - 2; I >= 0; I--)
-            {
-                for (J = N - 1; J >= I + 1; J--)
-                {
-                    Y[I] -= X[I, J] * Y[J];
-                }
-            }
-        }
+
 
         void SafelyExit()
         {
@@ -488,124 +430,6 @@ namespace IngameScript
             {
                 thisThruster.SetValue("Override", 0f);
             }
-
         }
-
-        #region PID
-
-        int VectorCompareDirection(Vector3D a, Vector3D b) //returns -1 if vectors return negative dot product 
-        {
-            double check = a.Dot(b);
-            if (check < 0)
-                return -1;
-            else
-                return 1;
-        }
-
-        double VectorAngleBetween(Vector3D a, Vector3D b) //returns radians 
-        {
-            if (a.LengthSquared() == 0 || b.LengthSquared() == 0)
-                return 0;
-            else
-                return Math.Acos(MathHelper.Clamp(a.Dot(b) / a.Length() / b.Length(), -1, 1));
-        }
-
-        Vector3D VectorProjection(Vector3D a, Vector3D b) //proj a on b    
-        {
-            Vector3D projection = a.Dot(b) / b.LengthSquared() * b;
-            return projection;
-        }
-
-        //Whip's PID controller class v6 - 11/22/17
-        public class PID
-        {
-            double _kP = 0;
-            double _kI = 0;
-            double _kD = 0;
-            double _integralDecayRatio = 0;
-            double _lowerBound = 0;
-            double _upperBound = 0;
-            double _timeStep = 0;
-            double _inverseTimeStep = 0;
-            double _errorSum = 0;
-            double _lastError = 0;
-            bool _firstRun = true;
-            bool _integralDecay = false;
-            public double Value { get; private set; }
-
-            public PID(double kP, double kI, double kD, double lowerBound, double upperBound, double timeStep)
-            {
-                _kP = kP;
-                _kI = kI;
-                _kD = kD;
-                _lowerBound = lowerBound;
-                _upperBound = upperBound;
-                _timeStep = timeStep;
-                _inverseTimeStep = 1 / _timeStep;
-                _integralDecay = false;
-            }
-
-            public PID(double kP, double kI, double kD, double integralDecayRatio, double timeStep)
-            {
-                _kP = kP;
-                _kI = kI;
-                _kD = kD;
-                _timeStep = timeStep;
-                _inverseTimeStep = 1 / _timeStep;
-                _integralDecayRatio = integralDecayRatio;
-                _integralDecay = true;
-            }
-
-            public double Control(double error)
-            {
-                //Compute derivative term
-                var errorDerivative = (error - _lastError) * _inverseTimeStep;
-
-                if (_firstRun)
-                {
-                    errorDerivative = 0;
-                    _firstRun = false;
-                }
-
-                //Compute integral term
-                if (!_integralDecay)
-                {
-                    _errorSum += error * _timeStep;
-
-                    //Clamp integral term
-                    if (_errorSum > _upperBound)
-                        _errorSum = _upperBound;
-                    else if (_errorSum < _lowerBound)
-                        _errorSum = _lowerBound;
-                }
-                else
-                {
-                    _errorSum = _errorSum * (1.0 - _integralDecayRatio) + error * _timeStep;
-                }
-
-                //Store this error as last error
-                _lastError = error;
-
-                //Construct output
-                this.Value = _kP * error + _kI * _errorSum + _kD * errorDerivative;
-                return this.Value;
-            }
-
-            public double Control(double error, double timeStep)
-            {
-                _timeStep = timeStep;
-                _inverseTimeStep = 1 / _timeStep;
-                return Control(error);
-            }
-
-            public void Reset()
-            {
-                _errorSum = 0;
-                _lastError = 0;
-                _firstRun = true;
-            }
-        }
-
-        #endregion
     }
 }

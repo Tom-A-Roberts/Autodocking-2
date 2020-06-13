@@ -27,7 +27,7 @@ namespace IngameScript
         /// </summary>
         public class ShipSystemsAnalyzer
         {
-            readonly Program parent_program;
+            public Program parent_program;
             private bool firstTime = true;
 
             /// <summary>
@@ -42,6 +42,7 @@ namespace IngameScript
             public List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
             public List<IMyGyro> gyros = new List<IMyGyro>();
 
+
             /// <summary>
             /// Mass of the ship in Kilograms
             /// </summary>
@@ -51,11 +52,25 @@ namespace IngameScript
             /// </summary>
             public float previousShipMass = 9999;
 
+            //List<IMyThrust> ForwardThrusters = new List<IMyThrust>(); // Forward with respect to the direction the thrusters will be firing
+            //List<IMyThrust> LeftThrusters = new List<IMyThrust>();
+            //List<IMyThrust> UpThrusters = new List<IMyThrust>();
+
+
+
+
+            
             public ShipSystemsAnalyzer(Program _parent_program)
             {
+
                 parent_program = _parent_program;
-                Echo2("INITIALIZED\n");
+                parent_program.Echo("Here1!");
+                parent_program.Echo(parent_program.ToString());
+                parent_program.Echo(parent_program.shipIOHandler.ToString());
+                parent_program.shipIOHandler.Echo("INITIALIZED\n");
+                parent_program.Echo("Here2!");
                 GatherBasicData();
+                
             }
 
             /// <summary>
@@ -65,9 +80,9 @@ namespace IngameScript
             public void GatherBasicData()
             {
                 parent_program.GridTerminalSystem.GetBlocks(blocks);
-                if (!firstTime && !scriptEnabled)
+                if (!firstTime && !parent_program.scriptEnabled)
                 {
-                    Echo2("RE-INITIALIZED\nSome change was detected\nso I have re-checked ship data.");
+                    parent_program.shipIOHandler.Echo("RE-INITIALIZED\nSome change was detected\nso I have re-checked ship data.");
                 }
                 
 
@@ -80,7 +95,7 @@ namespace IngameScript
                 }
                 else
                 {
-                    Error("The ship systems analyzer couldn't find some sort of cockpit or remote control.\nPlease check you have one of these, captain.");
+                    parent_program.shipIOHandler.Error("The ship systems analyzer couldn't find some sort of cockpit or remote control.\nPlease check you have one of these, captain.");
                 }
 
                 myConnector = FindConnector();
@@ -90,11 +105,11 @@ namespace IngameScript
                 {
                     if (firstTime)
                     {
-                        Echo2("Mass: " + shipMass.ToString());
-                        Echo2("Thruster count: " + thrusters.Count.ToString());
-                        Echo2("Gyro count: " + gyros.Count.ToString());
-                        Echo2("Waiting for orders, Your Highness.");
-                        EchoFinish(false);
+                        parent_program.shipIOHandler.Echo("Mass: " + shipMass.ToString());
+                        parent_program.shipIOHandler.Echo("Thruster count: " + thrusters.Count.ToString());
+                        parent_program.shipIOHandler.Echo("Gyro count: " + gyros.Count.ToString());
+                        parent_program.shipIOHandler.Echo("Waiting for orders, Your Highness.");
+                        parent_program.shipIOHandler.EchoFinish(false);
                     }
                 }
                 firstTime = false;
@@ -207,7 +222,7 @@ namespace IngameScript
                 }
                 if (foundConnector == null)
                 {
-                    Error("I couldn't find a connector on this ship, Your Highness.");
+                    parent_program.shipIOHandler.Error("I couldn't find a connector on this ship, Your Highness.");
                 }
                 return foundConnector;
             }
@@ -252,20 +267,21 @@ namespace IngameScript
             }
 
 
-            #region Overrides
-            private void Echo2(object inp)
-            {
-                parent_program.shipIOHandler.Echo(inp);
-            }
-            private void EchoFinish(bool OnlyInProgrammingBlock = false)
-            {
-                parent_program.shipIOHandler.EchoFinish(OnlyInProgrammingBlock);
-            }
-            private void Error(string str)
-            {
-                parent_program.shipIOHandler.Error(str);
-            }
-            #endregion
+
+            //#region Overrides
+            //private void Echo(object inp)
+            //{
+            //    parent_program.shipIOHandler.Echo(inp);
+            //}
+            //private void EchoFinish(bool OnlyInProgrammingBlock = false)
+            //{
+            //    parent_program.shipIOHandler.EchoFinish(OnlyInProgrammingBlock);
+            //}
+            //private void Error(string str)
+            //{
+            //    parent_program.shipIOHandler.Error(str);
+            //}
+            //#endregion
         }
     }
 }

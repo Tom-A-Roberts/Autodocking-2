@@ -83,6 +83,52 @@ namespace IngameScript
                     }
                 }
             }
+
+
+            public void OutputHomeLocations()
+            {
+                Echo("\n   Home location Data:");
+                foreach (HomeLocation currentHomeLocation in parent_program.homeLocations)
+                {
+                    Echo("Station conn: " + currentHomeLocation.station_connector_name);
+                    IMyShipConnector my_connector = (IMyShipConnector)parent_program.GridTerminalSystem.GetBlockWithId(currentHomeLocation.my_connector_ID);
+                    Echo("Ship conn: " + my_connector.CustomName);
+                    string argStr = "ARGS: ";
+                    foreach (string arg in currentHomeLocation.arguments)
+                    {
+                        argStr += arg + ", ";
+                    }
+                    Echo(argStr + "\n");
+
+                }
+            }
+
+            public void DockingSequenceStartMessage(string argument)
+            {
+                if (parent_program.scriptEnabled)
+                {
+                    if (argument == "")
+                    {
+                        Echo("RUNNING\nRe-starting docking sequence\nwith no argument.");
+                    }
+                    else
+                    {
+                        Echo("RUNNING\nRe-starting docking sequence\nwith new argument: " + argument);
+                    }
+                }
+                else
+                {
+                    if (argument == "")
+                    {
+                        Echo("RUNNING\nAttempting docking sequence\nwith no argument.");
+                    }
+                    else
+                    {
+                        Echo("RUNNING\nAttempting docking sequence\nwith argument: " + argument);
+                    }
+                }
+
+            }
         }
     }
 }
