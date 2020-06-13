@@ -14,21 +14,19 @@ namespace IngameScript
 
         const double updatesPerSecond = 10;
 
-        IMyShipConnector myConnector;
+        
         string current_argument;
 
-        List<IMyThrust> thrusters = new List<IMyThrust>();
-        List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
-        List<IMyGyro> gyros = new List<IMyGyro>();
         List<Vector3D> shipForwardLocal = new List<Vector3D>();
         List<Vector3D> shipUpwardLocal = new List<Vector3D>();
 
-        IMyShipController cockpit = null;
+        ShipSystemsAnalyzer systemsAnalyzer;
+        IOHandler shipIOHandler;
 
-        float shipMass = 9999; // In KG
-        float previousShipMass = 9999;
+
+
         bool errorState = false;
-        bool scriptEnabled = false;
+        static bool scriptEnabled = false;
         //string persistantText = "";
 
         double angleRoll = 0;
@@ -44,254 +42,37 @@ namespace IngameScript
 
         List<HomeLocation> homeLocations = new List<HomeLocation>();
 
-        public class HomeLocation
-        {
-            public HashSet<string> arguments = new HashSet<string>();
-            public long my_connector_ID; // myConnector.EntityId;
-            public long station_connector_ID;
-            public string station_connector_name;
-            public Vector3D station_connector_position;
-            public Vector3D station_connector_forward;
-            public Vector3D station_connector_up;
-            public HomeLocation(string new_arg, IMyShipConnector my_connector, IMyShipConnector station_connector)
-            {
-                arguments.Add(new_arg);
-                my_connector_ID = my_connector.EntityId;
-                station_connector_ID = station_connector.EntityId;
-                station_connector_position = station_connector.GetPosition();
-                station_connector_forward = station_connector.WorldMatrix.Up;
-                station_connector_up = -station_connector.WorldMatrix.Forward;
-                station_connector_name = station_connector.CustomName;
-            }
-            public string ProduceSaveData()
-            {
-                return null;
-            }
-            public void UpdateData(IMyShipConnector my_connector, IMyShipConnector station_connector)
-            {
-                my_connector_ID = my_connector.EntityId;
-                station_connector_ID = station_connector.EntityId;
-                station_connector_position = station_connector.GetPosition();
-                station_connector_forward = station_connector.WorldMatrix.Up;
-                station_connector_up = -station_connector.WorldMatrix.Forward;
-                station_connector_name = station_connector.CustomName;
-
-            }
-            public override bool Equals(Object obj)
-            {
-                if ((obj == null) || this.GetType() == obj.GetType())
-                {
-                    return false;
-                }
-                else
-                {
-                    HomeLocation test = (HomeLocation)obj;
-                    if (my_connector_ID == test.my_connector_ID && station_connector_ID == test.station_connector_ID)
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            public override int GetHashCode()
-            {
-                var hashCode = -48872655;
-                hashCode = hashCode * -1521134295 + EqualityComparer<HashSet<string>>.Default.GetHashCode(arguments);
-                hashCode = hashCode * -1521134295 + my_connector_ID.GetHashCode();
-                hashCode = hashCode * -1521134295 + station_connector_ID.GetHashCode();
-                // hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode (station_connector_name);
-                // hashCode = hashCode * -1521134295 + EqualityComparer<Vector3D>.Default.GetHashCode (station_connector_position);
-                // hashCode = hashCode * -1521134295 + EqualityComparer<Vector3D>.Default.GetHashCode (station_connector_forward);
-                // hashCode = hashCode * -1521134295 + EqualityComparer<Vector3D>.Default.GetHashCode (station_connector_up);
-                return hashCode;
-            }
-        }
-
-        #region Block_Finding
-
-        void GatherBasicData(bool firstTime = false)
-        {
-            GridTerminalSystem.GetBlocks(blocks);
-            if (firstTime)
-            {
-                Echo2("INITIALIZED\n");
-            }
-            else
-            {
-                if (!scriptEnabled)
-                {
-                    Echo2("RE-INITIALIZED\nSome change was detected\nso I have re-checked ship data.");
-                }
-            }
-
-            cockpit = FindCockpit();
-            if (cockpit != null)
-            {
-                var Masses = cockpit.CalculateShipMass();
-                shipMass = Masses.PhysicalMass; //In kg
-                                                //Echo2 ("Mass: " + shipMass.ToString ());
-                previousShipMass = shipMass;
-            }
-            else
-            {
-                Error("I couldn't find a cockpit or remote control, thanks noob.");
-            }
-
-            myConnector = FindConnector();
-            thrusters = FindThrusters();
-            gyros = FindGyros();
-            if (!errorState)
-            {
-                if (firstTime)
-                {
-                    Echo2("Mass: " + shipMass.ToString());
-                    Echo2("Thruster count: " + thrusters.Count.ToString());
-                    Echo2("Gyro count: " + gyros.Count.ToString());
-                    Echo2("Waiting for orders, Your Highness.");
-                    EchoFinish(false);
-                }
-            }
-        }
-
-        public bool blockIsOnMyGrid(IMyTerminalBlock block)
-        {
-            return block.CubeGrid.ToString() == Me.CubeGrid.ToString();
-        }
-
-        void Error(string ErrorString)
-        {
-            if (!errorState)
-            {
-                echoLine = "";
-            }
-            //persistantText += "ISSUE:\n" + ErrorString;
-            Echo2("ERROR:\n" + ErrorString);
-            errorState = true;
-            SafelyExit();
-            EchoFinish(false);
-        }
-
-        IMyShipController FindCockpit()
-        {
-            List<IMyShipController> cockpits = new List<IMyShipController>();
-            IMyShipController foundCockpit = null;
-            bool foundMainCockpit = false;
-            foreach (var block in blocks)
-            {
-                if (block is IMyShipController && blockIsOnMyGrid(block))
-                {
-                    if (foundCockpit == null)
-                    {
-                        foundCockpit = (IMyShipController)block;
-                    }
-                    if (block is IMyCockpit)
-                    {
-                        IMyCockpit c_cockpit = (IMyCockpit)block;
-                        if (foundMainCockpit == false)
-                        {
-                            foundCockpit = (IMyShipController)block;
-                        }
-                        if (c_cockpit.IsMainCockpit == true)
-                        {
-                            foundMainCockpit = true;
-                            foundCockpit = (IMyShipController)block;
-                        }
-                    }
-                    if (block is IMyRemoteControl && foundMainCockpit == false)
-                    {
-                        foundCockpit = (IMyShipController)block;
-                    }
-                }
-            }
-            return foundCockpit;
-        }
-
-        IMyShipConnector FindConnector()
-        {
-
-            IMyShipConnector foundConnector = null;
-            foreach (var block in blocks)
-            {
-                if (block is IMyShipConnector && blockIsOnMyGrid(block))
-                {
-                    if (foundConnector == null)
-                    {
-                        foundConnector = (IMyShipConnector)block;
-                    }
-                    if (block.CustomName.ToLower().Contains("[dock]") == true)
-                    {
-                        foundConnector = (IMyShipConnector)block;
-                    }
-                }
-            }
-            if (foundConnector == null)
-            {
-                Error("I couldn't find a connector on this ship, Your Highness.");
-            }
-            return foundConnector;
-        }
-
-        List<IMyThrust> FindThrusters()
-        {
-            List<IMyThrust> o_thrusters = new List<IMyThrust>();
-
-            foreach (var block in blocks)
-            {
-                if (block is IMyThrust && block.IsWorking && blockIsOnMyGrid(block))
-                {
-
-                    o_thrusters.Add((IMyThrust)block);
-                }
-            }
-
-            return o_thrusters;
-        }
-
-        List<IMyGyro> FindGyros()
-        {
-            List<IMyGyro> o_gyros = new List<IMyGyro>();
-            foreach (var block in blocks)
-            {
-                if (block is IMyGyro && block.IsWorking && blockIsOnMyGrid(block))
-                {
-                    o_gyros.Add((IMyGyro)block);
-                }
-            }
-            return o_gyros;
-        }
-
-        #endregion
 
         public Program()
         {
             errorState = false;
             Runtime.UpdateFrequency = UpdateFrequency.Once;
+
+            systemsAnalyzer = new ShipSystemsAnalyzer(this);
+            shipIOHandler = new IOHandler(this);
+
             pitchPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
             rollPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
 
-            GatherBasicData(true);
+            
             timeElapsed = 0;
             SafelyExit();
         }
 
         void OutputHomeLocations()
         {
-            Echo2("\n   Home location Data:");
+            shipIOHandler.Echo("\n   Home location Data:");
             foreach (HomeLocation currentHomeLocation in homeLocations)
             {
-                Echo2("Station conn: " + currentHomeLocation.station_connector_name);
+                shipIOHandler.Echo("Station conn: " + currentHomeLocation.station_connector_name);
                 IMyShipConnector my_connector = (IMyShipConnector)GridTerminalSystem.GetBlockWithId(currentHomeLocation.my_connector_ID);
-                Echo2("Ship conn: " + my_connector.CustomName);
+                shipIOHandler.Echo("Ship conn: " + my_connector.CustomName);
                 string argStr = "ARGS: ";
                 foreach (string arg in currentHomeLocation.arguments)
                 {
                     argStr += arg + ", ";
                 }
-                Echo2(argStr + "\n");
+                shipIOHandler.Echo(argStr + "\n");
 
             }
         }
@@ -299,15 +80,15 @@ namespace IngameScript
         //Yeah thanks a lot, Whip.
         void AlignWithGravity()
         {
-            IMyShipConnector referenceBlock = myConnector;
+            IMyShipConnector referenceBlock = systemsAnalyzer.myConnector;
 
             var referenceOrigin = referenceBlock.GetPosition();
-            var gravityVec = cockpit.GetNaturalGravity();
+            var gravityVec = systemsAnalyzer.cockpit.GetNaturalGravity();
             var gravityVecLength = gravityVec.Length();
             if (gravityVec.LengthSquared() == 0)
             {
                 Echo("No gravity");
-                foreach (IMyGyro thisGyro in gyros)
+                foreach (IMyGyro thisGyro in systemsAnalyzer.gyros)
                 {
                     thisGyro.SetValue("Override", false);
                 }
@@ -347,7 +128,7 @@ namespace IngameScript
             if (!errorState)
             {
                 //do gyros
-                ApplyGyroOverride(pitchSpeed, 0, -rollSpeed, gyros, block_WorldMatrix);
+                ApplyGyroOverride(pitchSpeed, 0, -rollSpeed, systemsAnalyzer.gyros, block_WorldMatrix);
 
             }
             else
@@ -356,31 +137,10 @@ namespace IngameScript
             }
         }
 
-        string echoLine = "";
-        void Echo2(Object inp)
-        {
-            echoLine += inp.ToString() + "\n";
-        }
+        
 
-        void EchoFinish(bool OnlyInProgrammingBlock = false)
-        {
-            if (echoLine != "")
-            {
-                Echo(echoLine);
-                if (!OnlyInProgrammingBlock)
-                {
-                    IMyTextSurface surface = GridTerminalSystem.GetBlockWithName("LCD Panel") as IMyTextSurface;
-                    if (surface != null)
-                    {
-                        surface.ContentType = ContentType.TEXT_AND_IMAGE;
-                        surface.FontSize = 1;
-                        surface.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
-                        surface.WriteText(echoLine);
-                    }
-                    echoLine = "";
-                }
-            }
-        }
+
+
 
         void ApplyGyroOverride(double pitch_speed, double yaw_speed, double roll_speed, List<IMyGyro> gyro_list, MatrixD b_WorldMatrix)
         {
@@ -410,46 +170,8 @@ namespace IngameScript
             current_argument = argument;
             scriptEnabled = true;
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
-            myConnector = beginConnector;
-
+            systemsAnalyzer.myConnector = beginConnector;
             OutputHomeLocations();
-
-        }
-
-        public IMyShipConnector FindMyConnectedConnector()
-        {
-            IMyShipConnector output = null;
-            List<IMyShipConnector> Connectors = new List<IMyShipConnector>();
-            GridTerminalSystem.GetBlocksOfType<IMyShipConnector>(Connectors);
-
-            bool found_connected_connector = false;
-            bool found_connectable_connector = false;
-            foreach (var connector in Connectors)
-            {
-                if (cockpit.CubeGrid.ToString() == connector.CubeGrid.ToString())
-                {
-                    if (connector.Status == MyShipConnectorStatus.Connected)
-                    {
-                        if (!found_connected_connector)
-                        {
-                            found_connected_connector = true;
-                            output = connector;
-                        }
-                    }
-                    else if (connector.Status == MyShipConnectorStatus.Connectable)
-                    {
-                        if (found_connected_connector == false)
-                        {
-                            if (!found_connectable_connector)
-                            {
-                                found_connectable_connector = true;
-                                output = connector;
-                            }
-                        }
-                    }
-                }
-            }
-            return output;
         }
 
         public string updateHomeLocation(string argument, IMyShipConnector my_connected_connector)
@@ -461,7 +183,7 @@ namespace IngameScript
             IMyShipConnector ship_connector = my_connected_connector.OtherConnector;
             if (ship_connector == null)
             {
-                Error("\nSomething went wrong when finding the connector.\nMaybe you have multiple connectors on the go, Your Majesty.");
+                shipIOHandler.Error("\nSomething went wrong when finding the connector.\nMaybe you have multiple connectors on the go, captain?");
                 return "";
             }
 
@@ -470,21 +192,21 @@ namespace IngameScript
             int HomeLocationIndex = homeLocations.LastIndexOf(newHomeLocation);
             if (HomeLocationIndex != -1)
             {
-                Echo2("\nHome location already In! Adding arg.");
+                shipIOHandler.Echo("\nHome location already In! Adding arg.");
                 if (!homeLocations[HomeLocationIndex].arguments.Contains(argument))
                 {
                     homeLocations[HomeLocationIndex].arguments.Add(argument);
-                    Echo2("\nArg added.");
+                    shipIOHandler.Echo("\nArg added.");
                 }
                 else
                 {
-                    Echo2("\nArg already in!");
+                    shipIOHandler.Echo("\nArg already in!");
                 }
             }
             else
             {
                 homeLocations.Add(newHomeLocation);
-                Echo2("\nAdded new home location.");
+                shipIOHandler.Echo("\nAdded new home location.");
             }
 
             // if (homeLocations.Contains (argument)) {
@@ -517,56 +239,56 @@ namespace IngameScript
                 if (errorState)
                 {
                     errorState = false;
-                    GatherBasicData();
+                    systemsAnalyzer.GatherBasicData();
                 }
                 if (!errorState)
                 {
-                    var my_connected_connector = FindMyConnectedConnector();
+                    var my_connected_connector = systemsAnalyzer.FindMyConnectedConnector();
                     if (my_connected_connector == null)
                     {
                         if (scriptEnabled)
                         {
                             if (argument == current_argument)
                             {
-                                Echo2("STOPPED\nAwaiting orders, Your Grace");
+                                shipIOHandler.Echo("STOPPED\nAwaiting orders, Your Grace");
                                 SafelyExit();
                             }
                             else
                             {
                                 if (argument == "")
                                 {
-                                    Echo2("RUNNING\nRe-starting docking sequence\nwith no argument.");
+                                    shipIOHandler.Echo("RUNNING\nRe-starting docking sequence\nwith no argument.");
                                 }
                                 else
                                 {
-                                    Echo2("RUNNING\nRe-starting docking sequence\nwith new argument: " + argument);
+                                    shipIOHandler.Echo("RUNNING\nRe-starting docking sequence\nwith new argument: " + argument);
                                 }
-                                Begin(myConnector, argument);
+                                Begin(systemsAnalyzer.myConnector, argument);
                             }
                         }
                         else
                         {
                             if (argument == "")
                             {
-                                Echo2("RUNNING\nAttempting docking sequence\nwith no argument.");
+                                shipIOHandler.Echo("RUNNING\nAttempting docking sequence\nwith no argument.");
                             }
                             else
                             {
-                                Echo2("RUNNING\nAttempting docking sequence\nwith argument: " + argument);
+                                shipIOHandler.Echo("RUNNING\nAttempting docking sequence\nwith argument: " + argument);
                             }
 
-                            Begin(myConnector, argument);
+                            Begin(systemsAnalyzer.myConnector, argument);
                         }
                     }
                     else
                     {
                         var result = updateHomeLocation(argument, my_connected_connector);
-                        Echo2(result);
-                        Echo2("\nThis location also has\nother arguments associated:");
+                        shipIOHandler.Echo(result);
+                        shipIOHandler.Echo("\nThis location also has\nother arguments associated:");
                         SafelyExit();
                     }
                 }
-                EchoFinish(false);
+                shipIOHandler.EchoFinish(false);
             }
 
             if (scriptEnabled && !errorState)
@@ -576,17 +298,11 @@ namespace IngameScript
                 if (timeElapsed >= timeLimit)
                 {
 
-                    var Masses = cockpit.CalculateShipMass();
-                    shipMass = Masses.PhysicalMass; //In kg
-                    if (previousShipMass != shipMass)
-                    {
-                        GatherBasicData();
-                    }
-                    previousShipMass = shipMass;
+                    systemsAnalyzer.CheckForMassChange();
 
                     AlignWithGravity();
-                    var velocity = cockpit.GetShipVelocities().LinearVelocity;
-                    //Echo2 (velocity);
+                    var velocity = systemsAnalyzer.cockpit.GetShipVelocities().LinearVelocity;
+                    //shipIOHandler.Echo (velocity);
                     float m = 0;
                     SetResultantAcceleration(-(float)velocity.X * m, -(float)velocity.Y * m, -(float)velocity.Z * m);
                     timeElapsed = 0;
@@ -602,14 +318,14 @@ namespace IngameScript
 
         void SetResultantAcceleration(float xForce, float yForce, float zForce)
         {
-            var CurrentFeltForce = cockpit.GetTotalGravity();
+            var CurrentFeltForce = systemsAnalyzer.cockpit.GetTotalGravity();
             var CurrentFeltForceAmount = CurrentFeltForce.Length();
 
-            var ForceToApply = (new Vector3D(xForce, yForce, zForce) - CurrentFeltForce) * shipMass;
+            var ForceToApply = (new Vector3D(xForce, yForce, zForce) - CurrentFeltForce) * systemsAnalyzer.shipMass;
 
-            //Echo2 ("Force to apply: " + ForceToApply.Length ().ToString ("0,0"));
+            //shipIOHandler.Echo ("Force to apply: " + ForceToApply.Length ().ToString ("0,0"));
 
-            IMyShipConnector referenceBlock = myConnector;
+            IMyShipConnector referenceBlock = systemsAnalyzer.myConnector;
             var referenceOrigin = referenceBlock.GetPosition();
 
             var block_WorldMatrix = VRageMath.Matrix.CreateWorld(referenceOrigin,
@@ -638,7 +354,7 @@ namespace IngameScript
             List<IMyThrust> LeftThrusters = new List<IMyThrust>();
             List<IMyThrust> UpThrusters = new List<IMyThrust>();
 
-            foreach (IMyThrust thisThruster in thrusters)
+            foreach (IMyThrust thisThruster in systemsAnalyzer.thrusters)
             {
                 var thrusterDirection = -thisThruster.WorldMatrix.Forward;
                 double forwardDot = Vector3D.Dot(thrusterDirection, Vector3D.Normalize(thrustForward));
@@ -677,23 +393,23 @@ namespace IngameScript
             {
                 UpMaxThrust += thisThruster.MaxEffectiveThrust;
             }
-            //Echo2 (ForwardMaxThrust.ToString ("0,0"));
-            //Echo2 (LeftMaxThrust.ToString ("0,0"));
-            //Echo2 (UpMaxThrust.ToString ("0,0") + "\n");
+            //shipIOHandler.Echo (ForwardMaxThrust.ToString ("0,0"));
+            //shipIOHandler.Echo (LeftMaxThrust.ToString ("0,0"));
+            //shipIOHandler.Echo (UpMaxThrust.ToString ("0,0") + "\n");
 
             double ForwardThrustToApply = 0;
             double LeftThrustToApply = 0;
             double UpThrustToApply = 0;
 
             var mat = new double[,] { { thrustForward.X, thrustLeft.X, thrustUp.X }, { thrustForward.Y, thrustLeft.Y, thrustUp.Y }, { thrustForward.Z, thrustLeft.Z, thrustUp.Z },
-    };
+            };
 
             var ans = new double[] { ForceToApply.X, ForceToApply.Y, ForceToApply.Z };
             ComputeCoefficients(mat, ans);
 
-            // Echo2 (ans[0].ToString ());
-            // Echo2 (ans[1].ToString ());
-            // Echo2 (ans[2].ToString ());
+            // shipIOHandler.Echo (ans[0].ToString ());
+            // shipIOHandler.Echo (ans[1].ToString ());
+            // shipIOHandler.Echo (ans[2].ToString ());
             ForwardThrustToApply = ans[0];
             LeftThrustToApply = ans[1];
             UpThrustToApply = ans[2];
@@ -764,11 +480,11 @@ namespace IngameScript
             //Runtime.UpdateFrequency = UpdateFrequency.Once;
             Runtime.UpdateFrequency |= UpdateFrequency.Update1;
             scriptEnabled = false;
-            foreach (IMyGyro thisGyro in gyros)
+            foreach (IMyGyro thisGyro in systemsAnalyzer.gyros)
             {
                 thisGyro.SetValue("Override", false);
             }
-            foreach (IMyThrust thisThruster in thrusters)
+            foreach (IMyThrust thisThruster in systemsAnalyzer.thrusters)
             {
                 thisThruster.SetValue("Override", 0f);
             }
