@@ -266,9 +266,9 @@ namespace IngameScript
         /// </summary>
         void DockingSequenceFrameUpdate()
         {
-                AlignWithGravity();
+                //AlignWithGravity();
                 var velocity = systemsAnalyzer.cockpit.GetShipVelocities().LinearVelocity;
-                float m = 0;
+                float m = 1;
                 SetResultantAcceleration(-(float)velocity.X * m, -(float)velocity.Y * m, -(float)velocity.Z * m);
         }
 
@@ -288,6 +288,9 @@ namespace IngameScript
                 ForceDirection, systemsAnalyzer.myConnector, systemsAnalyzer);
 
 
+            //ForceToApply = ForceDirection * thrusterAnalysis.maxAvailableThrustInDirection;
+
+
             double ForwardThrustToApply = 0;
             double LeftThrustToApply = 0;
             double UpThrustToApply = 0;
@@ -301,38 +304,12 @@ namespace IngameScript
             var ans = new double[] { ForceToApply.X, ForceToApply.Y, ForceToApply.Z };
             PID.ComputeCoefficients(mat, ans);
 
-            // shipIOHandler.Echo (ans[0].ToString ());
-            // shipIOHandler.Echo (ans[1].ToString ());
-            // shipIOHandler.Echo (ans[2].ToString ());
+
             ForwardThrustToApply = ans[0];
             LeftThrustToApply = ans[1];
             UpThrustToApply = ans[2];
 
-            double ForwardThrustProportion = ForwardThrustToApply / thrusterAnalysis.ForwardMaxThrust;
-            double LeftThrustProportion = LeftThrustToApply / thrusterAnalysis.LeftMaxThrust;
-            double UpThrustProportion = UpThrustToApply / thrusterAnalysis.UpMaxThrust;
-
-            foreach (IMyThrust thisThruster in thrusterAnalysis.ForceForwardThrusters)
-            {
-                thisThruster.ThrustOverride = (float)(thisThruster.MaxThrust * ForwardThrustProportion);
-                //thisThruster.ThrustOverride = thisThruster.MaxThrust;
-            }
-            foreach (IMyThrust thisThruster in thrusterAnalysis.ForceLeftThrusters)
-            {
-                thisThruster.ThrustOverride = (float)(thisThruster.MaxThrust * (float)LeftThrustProportion);
-                //thisThruster.ThrustOverride = thisThruster.MaxThrust;
-            }
-            foreach (IMyThrust thisThruster in thrusterAnalysis.ForceUpThrusters)
-            {
-                thisThruster.ThrustOverride = (float)(thisThruster.MaxThrust * (float)UpThrustProportion);
-                //thisThruster.ThrustOverride = thisThruster.MaxThrust;
-            }
-            foreach (IMyThrust thisThruster in thrusterAnalysis.UnusedThrusters)
-            {
-                thisThruster.ThrustOverride = 0;
-                //thisThruster.ThrustOverride = thisThruster.MaxThrust;
-            }
-
+            systemsController.SetThrusterForces(thrusterAnalysis, ForwardThrustToApply, LeftThrustToApply, UpThrustToApply);
 
         }
 

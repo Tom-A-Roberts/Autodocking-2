@@ -65,6 +65,10 @@ namespace IngameScript
                 public double ForwardMaxThrust;
                 public double LeftMaxThrust;
                 public double UpMaxThrust;
+                /// <summary>
+                /// This is the raw value (not including gravity and such) that the thrusters can possibly push the ship in the given direction.
+                /// </summary>
+                //public double maxAvailableThrustInDirection; 
                 // Thrust directions
                 public Vector3D thrustForward;
                 public Vector3D thrustLeft;
@@ -72,6 +76,7 @@ namespace IngameScript
 
                 public IMyTerminalBlock blockWithRespectTo;
                 public Vector3D analysisDirection;
+
 
 
                 public ThrusterForceAnalysis(Vector3D directionToAnalyze, IMyTerminalBlock _blockWithRespectTo, ShipSystemsAnalyzer _systems_parent)
@@ -91,7 +96,6 @@ namespace IngameScript
                     ForwardMaxThrust = 0;
                     LeftMaxThrust = 0;
                     UpMaxThrust = 0;
-
 
                     var referenceOrigin = blockWithRespectTo.GetPosition();
 
@@ -138,7 +142,6 @@ namespace IngameScript
                         }
                         else
                         {
-                            //thisThruster.ThrustOverride = 0f; // WARNING THRUSTER CONTROL HERE!
                             UnusedThrusters.Add(thisThruster);
                         }
                     }
@@ -156,8 +159,41 @@ namespace IngameScript
                         UpMaxThrust += thisThruster.MaxEffectiveThrust;
                     }
 
+                    //double a = ForwardMaxThrust;
+                    //double b = UpMaxThrust;
+                    //double c = LeftMaxThrust;
 
+                    //double a1 = directionToAnalyze.X;
+                    //double a2 = directionToAnalyze.Y;
+                    //double a3 = directionToAnalyze.Z;
 
+                    //double Alpha = a1 / a;
+                    //double Beta = a2 / b;
+                    //double Gamma = a3 / c;
+
+                    //double max = Math.Max(Math.Max(Alpha,Beta), Gamma);
+                    //double t = 1 / max;
+
+                    //maxAvailableThrustInDirection = (t * Vector3D.Normalize(directionToAnalyze)).Length();
+                }
+
+                public double FindMaxAvailableThrustInDirection(double f_max_thrust, double u_max_thrust, double l_max_thrust, Vector3D thrust_direction)
+                {
+                    double a = f_max_thrust;
+                    double b = u_max_thrust;
+                    double c = l_max_thrust;
+
+                    double a1 = thrust_direction.X;
+                    double a2 = thrust_direction.Y;
+                    double a3 = thrust_direction.Z;
+
+                    double Alpha = a1 / a;
+                    double Beta = a2 / b;
+                    double Gamma = a3 / c;
+
+                    double max = Math.Max(Math.Max(Alpha, Beta), Gamma);
+                    double t = 1 / max;
+                    return (t * Vector3D.Normalize(thrust_direction)).Length();
                 }
             }
 
