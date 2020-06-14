@@ -52,22 +52,130 @@ namespace IngameScript
             /// </summary>
             public float previousShipMass = 9999;
 
-            //List<IMyThrust> ForwardThrusters = new List<IMyThrust>(); // Forward with respect to the direction the thrusters will be firing
-            //List<IMyThrust> LeftThrusters = new List<IMyThrust>();
-            //List<IMyThrust> UpThrusters = new List<IMyThrust>();
+            public struct ThrusterForceAnalysis
+            {
+                ShipSystemsAnalyzer systems_parent;
+
+                // Thruster groups
+                public List<IMyThrust> ForceForwardThrusters; // Forward with respect to the direction the thrusters will be firing
+                public List<IMyThrust> ForceLeftThrusters;
+                public List<IMyThrust> ForceUpThrusters;
+                public List<IMyThrust> UnusedThrusters;
+                // Accumulated max thrust numbers
+                public double ForwardMaxThrust;
+                public double LeftMaxThrust;
+                public double UpMaxThrust;
+                // Thrust directions
+                public Vector3D thrustForward;
+                public Vector3D thrustLeft;
+                public Vector3D thrustUp;
+
+                public IMyTerminalBlock blockWithRespectTo;
+                public Vector3D analysisDirection;
+
+
+                public ThrusterForceAnalysis(Vector3D directionToAnalyze, IMyTerminalBlock _blockWithRespectTo, ShipSystemsAnalyzer _systems_parent)
+                {
+                    blockWithRespectTo = _blockWithRespectTo;
+                    systems_parent = _systems_parent;
+                    analysisDirection = directionToAnalyze;
+
+                    
+                    ForceForwardThrusters = new List<IMyThrust>();
+                    ForceLeftThrusters = new List<IMyThrust>();
+                    ForceUpThrusters = new List<IMyThrust>();
+                    UnusedThrusters = new List<IMyThrust>();
 
 
 
+                    ForwardMaxThrust = 0;
+                    LeftMaxThrust = 0;
+                    UpMaxThrust = 0;
 
-            
+
+                    var referenceOrigin = blockWithRespectTo.GetPosition();
+
+                    var block_WorldMatrix = VRageMath.Matrix.CreateWorld(referenceOrigin,
+                        blockWithRespectTo.WorldMatrix.Up, //referenceBlock.WorldMatrix.Forward,
+                        -blockWithRespectTo.WorldMatrix.Forward //referenceBlock.WorldMatrix.Up
+                    );
+
+                    thrustForward = block_WorldMatrix.Forward;
+                    thrustLeft = block_WorldMatrix.Left;
+                    thrustUp = block_WorldMatrix.Up;
+
+                    if (thrustForward.Dot(analysisDirection) < 0)
+                    {
+                        thrustForward *= -1;
+                    }
+                    if (thrustLeft.Dot(analysisDirection) < 0)
+                    {
+                        thrustLeft *= -1;
+                    }
+                    if (thrustUp.Dot(analysisDirection) < 0)
+                    {
+                        thrustUp *= -1;
+                    }
+
+                    foreach (IMyThrust thisThruster in systems_parent.thrusters)
+                    {
+                        var thrusterDirection = -thisThruster.WorldMatrix.Forward;
+                        double forwardDot = Vector3D.Dot(thrusterDirection, Vector3D.Normalize(thrustForward));
+                        double leftDot = Vector3D.Dot(thrusterDirection, Vector3D.Normalize(thrustLeft));
+                        double upDot = Vector3D.Dot(thrusterDirection, Vector3D.Normalize(thrustUp));
+
+                        if (forwardDot >= 0.97)
+                        {
+                            ForceForwardThrusters.Add(thisThruster);
+                        }
+                        else if (leftDot >= 0.97)
+                        {
+                            ForceLeftThrusters.Add(thisThruster);
+                        }
+                        else if (upDot >= 0.97)
+                        {
+                            ForceUpThrusters.Add(thisThruster);
+                        }
+                        else
+                        {
+                            //thisThruster.ThrustOverride = 0f; // WARNING THRUSTER CONTROL HERE!
+                            UnusedThrusters.Add(thisThruster);
+                        }
+                    }
+
+                    foreach (IMyThrust thisThruster in ForceForwardThrusters)
+                    {
+                        ForwardMaxThrust += thisThruster.MaxEffectiveThrust;
+                    }
+                    foreach (IMyThrust thisThruster in ForceLeftThrusters)
+                    {
+                        LeftMaxThrust += thisThruster.MaxEffectiveThrust;
+                    }
+                    foreach (IMyThrust thisThruster in ForceUpThrusters)
+                    {
+                        UpMaxThrust += thisThruster.MaxEffectiveThrust;
+                    }
+
+
+
+                }
+            }
+
+
+
             public ShipSystemsAnalyzer(Program in_parent_program)
             {
                 parent_program = in_parent_program;
-
                 parent_program.shipIOHandler.Echo("INITIALIZED\n");
                 GatherBasicData();
-                
             }
+
+
+
+
+
+            #region Methods
+
 
             /// <summary>
             /// Gathers the blocks that relate to the ship. This includes:<br />
@@ -262,7 +370,7 @@ namespace IngameScript
                 return o_gyros;
             }
 
-
+            #endregion
 
             #region Overrides
             private void Echo(object inp)
@@ -279,5 +387,8 @@ namespace IngameScript
             }
             #endregion
         }
+
+
+
     }
 }

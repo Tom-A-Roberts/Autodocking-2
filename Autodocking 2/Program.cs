@@ -275,92 +275,27 @@ namespace IngameScript
 
         void SetResultantAcceleration(float xForce, float yForce, float zForce)
         {
-            var CurrentFeltForce = systemsAnalyzer.cockpit.GetTotalGravity();
-            var CurrentFeltForceAmount = CurrentFeltForce.Length();
+            var UnknownForces = Vector3.Zero;
+            var Gravity_And_Unknown_Forces = systemsAnalyzer.cockpit.GetTotalGravity() + UnknownForces;
+            var Gravity_And_Unknown_Forces_Length = Gravity_And_Unknown_Forces.Length();
 
-            var ForceToApply = (new Vector3D(xForce, yForce, zForce) - CurrentFeltForce) * systemsAnalyzer.shipMass;
+            var ForceToApply = (new Vector3D(xForce, yForce, zForce) - Gravity_And_Unknown_Forces) * systemsAnalyzer.shipMass;
 
-            //shipIOHandler.Echo ("Force to apply: " + ForceToApply.Length ().ToString ("0,0"));
+            // The FINAL force direction (aka, towards the connector)
+            Vector3D ForceDirection = Vector3D.Normalize(ForceToApply);
 
+            ShipSystemsAnalyzer.ThrusterForceAnalysis thrusterAnalysis = new ShipSystemsAnalyzer.ThrusterForceAnalysis(
+                ForceDirection, systemsAnalyzer.myConnector, systemsAnalyzer);
 
-
-            IMyShipConnector referenceBlock = systemsAnalyzer.myConnector;
-            var referenceOrigin = referenceBlock.GetPosition();
-
-            var block_WorldMatrix = VRageMath.Matrix.CreateWorld(referenceOrigin,
-                referenceBlock.WorldMatrix.Up, //referenceBlock.WorldMatrix.Forward,
-                -referenceBlock.WorldMatrix.Forward //referenceBlock.WorldMatrix.Up
-            );
-
-            var thrustForward = block_WorldMatrix.Forward;
-            var thrustLeft = block_WorldMatrix.Left;
-            var thrustUp = block_WorldMatrix.Up;
-
-            var normalizedForcetoApply = Vector3D.Normalize(ForceToApply);
-            if (thrustForward.Dot(normalizedForcetoApply) < 0)
-            {
-                thrustForward *= -1;
-            }
-            if (thrustLeft.Dot(normalizedForcetoApply) < 0)
-            {
-                thrustLeft *= -1;
-            }
-            if (thrustUp.Dot(normalizedForcetoApply) < 0)
-            {
-                thrustUp *= -1;
-            }
-            List<IMyThrust> ForwardThrusters = new List<IMyThrust>();
-            List<IMyThrust> LeftThrusters = new List<IMyThrust>();
-            List<IMyThrust> UpThrusters = new List<IMyThrust>();
-
-            foreach (IMyThrust thisThruster in systemsAnalyzer.thrusters)
-            {
-                var thrusterDirection = -thisThruster.WorldMatrix.Forward;
-                double forwardDot = Vector3D.Dot(thrusterDirection, Vector3D.Normalize(thrustForward));
-                double leftDot = Vector3D.Dot(thrusterDirection, Vector3D.Normalize(thrustLeft));
-                double upDot = Vector3D.Dot(thrusterDirection, Vector3D.Normalize(thrustUp));
-
-                if (forwardDot >= 0.97)
-                {
-                    ForwardThrusters.Add(thisThruster);
-                }
-                else if (leftDot >= 0.97)
-                {
-                    LeftThrusters.Add(thisThruster);
-                }
-                else if (upDot >= 0.97)
-                {
-                    UpThrusters.Add(thisThruster);
-                }
-                else
-                {
-                    thisThruster.ThrustOverride = 0f;
-                }
-            }
-            double ForwardMaxThrust = 0;
-            double LeftMaxThrust = 0;
-            double UpMaxThrust = 0;
-            foreach (IMyThrust thisThruster in ForwardThrusters)
-            {
-                ForwardMaxThrust += thisThruster.MaxEffectiveThrust;
-            }
-            foreach (IMyThrust thisThruster in LeftThrusters)
-            {
-                LeftMaxThrust += thisThruster.MaxEffectiveThrust;
-            }
-            foreach (IMyThrust thisThruster in UpThrusters)
-            {
-                UpMaxThrust += thisThruster.MaxEffectiveThrust;
-            }
-            //shipIOHandler.Echo (ForwardMaxThrust.ToString ("0,0"));
-            //shipIOHandler.Echo (LeftMaxThrust.ToString ("0,0"));
-            //shipIOHandler.Echo (UpMaxThrust.ToString ("0,0") + "\n");
 
             double ForwardThrustToApply = 0;
             double LeftThrustToApply = 0;
             double UpThrustToApply = 0;
 
-            var mat = new double[,] { { thrustForward.X, thrustLeft.X, thrustUp.X }, { thrustForward.Y, thrustLeft.Y, thrustUp.Y }, { thrustForward.Z, thrustLeft.Z, thrustUp.Z },
+            var mat = new double[,] {
+                { thrusterAnalysis.thrustForward.X, thrusterAnalysis.thrustLeft.X, thrusterAnalysis.thrustUp.X }, 
+                { thrusterAnalysis.thrustForward.Y, thrusterAnalysis.thrustLeft.Y, thrusterAnalysis.thrustUp.Y }, 
+                { thrusterAnalysis.thrustForward.Z, thrusterAnalysis.thrustLeft.Z, thrusterAnalysis.thrustUp.Z },
             };
 
             var ans = new double[] { ForceToApply.X, ForceToApply.Y, ForceToApply.Z };
@@ -373,25 +308,31 @@ namespace IngameScript
             LeftThrustToApply = ans[1];
             UpThrustToApply = ans[2];
 
-            double ForwardThrustProportion = ForwardThrustToApply / ForwardMaxThrust;
-            double LeftThrustProportion = LeftThrustToApply / LeftMaxThrust;
-            double UpThrustProportion = UpThrustToApply / UpMaxThrust;
+            double ForwardThrustProportion = ForwardThrustToApply / thrusterAnalysis.ForwardMaxThrust;
+            double LeftThrustProportion = LeftThrustToApply / thrusterAnalysis.LeftMaxThrust;
+            double UpThrustProportion = UpThrustToApply / thrusterAnalysis.UpMaxThrust;
 
-            foreach (IMyThrust thisThruster in ForwardThrusters)
+            foreach (IMyThrust thisThruster in thrusterAnalysis.ForceForwardThrusters)
             {
                 thisThruster.ThrustOverride = (float)(thisThruster.MaxThrust * ForwardThrustProportion);
                 //thisThruster.ThrustOverride = thisThruster.MaxThrust;
             }
-            foreach (IMyThrust thisThruster in LeftThrusters)
+            foreach (IMyThrust thisThruster in thrusterAnalysis.ForceLeftThrusters)
             {
                 thisThruster.ThrustOverride = (float)(thisThruster.MaxThrust * (float)LeftThrustProportion);
                 //thisThruster.ThrustOverride = thisThruster.MaxThrust;
             }
-            foreach (IMyThrust thisThruster in UpThrusters)
+            foreach (IMyThrust thisThruster in thrusterAnalysis.ForceUpThrusters)
             {
                 thisThruster.ThrustOverride = (float)(thisThruster.MaxThrust * (float)UpThrustProportion);
                 //thisThruster.ThrustOverride = thisThruster.MaxThrust;
             }
+            foreach (IMyThrust thisThruster in thrusterAnalysis.UnusedThrusters)
+            {
+                thisThruster.ThrustOverride = 0;
+                //thisThruster.ThrustOverride = thisThruster.MaxThrust;
+            }
+
 
         }
 
