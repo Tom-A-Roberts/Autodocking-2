@@ -146,3 +146,4 @@ E:\Users\spug\Documents\Space Engineers Scripting\Autodocking-2\Autodocking 2\bi
 E:\Users\spug\Documents\Space Engineers Scripting\Autodocking-2\Autodocking 2\obj\x64\Deploy\Autodocking 2.csproj.CopyComplete
 E:\Users\spug\Documents\Space Engineers Scripting\Autodocking-2\Autodocking 2\obj\x64\Deploy\Autodocking 2.exe
 E:\Users\spug\Documents\Space Engineers Scripting\Autodocking-2\Autodocking 2\obj\x64\Deploy\Autodocking 2.pdb
+E:\Users\spug\Documents\Space Engineers Scripting\Autodocking-2\Autodocking 2\obj\x64\Deploy\Autodocking 2.csprojAssemblyReference.cache

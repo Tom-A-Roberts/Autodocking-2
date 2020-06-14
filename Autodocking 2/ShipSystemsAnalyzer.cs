@@ -60,15 +60,11 @@ namespace IngameScript
 
 
             
-            public ShipSystemsAnalyzer(Program _parent_program)
+            public ShipSystemsAnalyzer(Program in_parent_program)
             {
+                parent_program = in_parent_program;
 
-                parent_program = _parent_program;
-                parent_program.Echo("Here1!");
-                parent_program.Echo(parent_program.ToString());
-                parent_program.Echo(parent_program.shipIOHandler.ToString());
                 parent_program.shipIOHandler.Echo("INITIALIZED\n");
-                parent_program.Echo("Here2!");
                 GatherBasicData();
                 
             }
@@ -222,7 +218,7 @@ namespace IngameScript
                 }
                 if (foundConnector == null)
                 {
-                    parent_program.shipIOHandler.Error("I couldn't find a connector on this ship, Your Highness.");
+                    Error("I couldn't find a connector on this ship, Your Highness.");
                 }
                 return foundConnector;
             }
@@ -268,20 +264,20 @@ namespace IngameScript
 
 
 
-            //#region Overrides
-            //private void Echo(object inp)
-            //{
-            //    parent_program.shipIOHandler.Echo(inp);
-            //}
-            //private void EchoFinish(bool OnlyInProgrammingBlock = false)
-            //{
-            //    parent_program.shipIOHandler.EchoFinish(OnlyInProgrammingBlock);
-            //}
-            //private void Error(string str)
-            //{
-            //    parent_program.shipIOHandler.Error(str);
-            //}
-            //#endregion
+            #region Overrides
+            private void Echo(object inp)
+            {
+                parent_program.shipIOHandler.Echo(inp);
+            }
+            private void EchoFinish(bool OnlyInProgrammingBlock = false)
+            {
+                parent_program.shipIOHandler.EchoFinish(OnlyInProgrammingBlock);
+            }
+            private void Error(string str)
+            {
+                parent_program.shipIOHandler.Error(str);
+            }
+            #endregion
         }
     }
 }

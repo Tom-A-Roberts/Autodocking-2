@@ -20,7 +20,7 @@ namespace IngameScript
 
         // Script systems:
         ShipSystemsAnalyzer systemsAnalyzer;
-        //ShipSystemsController systemsController;
+        ShipSystemsController systemsController;
         IOHandler shipIOHandler;
 
 
@@ -55,9 +55,9 @@ namespace IngameScript
             errorState = false;
             Runtime.UpdateFrequency = UpdateFrequency.Once;
 
-            systemsAnalyzer = new ShipSystemsAnalyzer(this);
             shipIOHandler = new IOHandler(this);
-
+            systemsAnalyzer = new ShipSystemsAnalyzer(this);
+            systemsController = new ShipSystemsController();
 
             pitchPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
             rollPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
@@ -120,7 +120,7 @@ namespace IngameScript
             if (!errorState)
             {
                 //do gyros
-                ApplyGyroOverride(pitchSpeed, 0, -rollSpeed, systemsAnalyzer.gyros, block_WorldMatrix);
+                systemsController.ApplyGyroOverride(pitchSpeed, 0, -rollSpeed, systemsAnalyzer.gyros, block_WorldMatrix);
 
             }
             else
@@ -128,24 +128,6 @@ namespace IngameScript
                 return;
             }
         }
-
-        void ApplyGyroOverride(double pitch_speed, double yaw_speed, double roll_speed, List<IMyGyro> gyro_list, MatrixD b_WorldMatrix)
-        {
-            var rotationVec = new Vector3D(-pitch_speed, yaw_speed, roll_speed); //because keen does some weird stuff with signs 
-            var relativeRotationVec = Vector3D.TransformNormal(rotationVec, b_WorldMatrix);
-
-            foreach (var thisGyro in gyro_list)
-            {
-                var gyroMatrix = thisGyro.WorldMatrix;
-                var transformedRotationVec = Vector3D.TransformNormal(relativeRotationVec, Matrix.Transpose(gyroMatrix));
-
-                thisGyro.Pitch = (float)transformedRotationVec.X;
-                thisGyro.Yaw = (float)transformedRotationVec.Y;
-                thisGyro.Roll = (float)transformedRotationVec.Z;
-                thisGyro.GyroOverride = true;
-            }
-        }
-
 
         public void Save()
         {
@@ -165,7 +147,7 @@ namespace IngameScript
             scriptEnabled = true;
             Runtime.UpdateFrequency = UpdateFrequency.Update1;
             systemsAnalyzer.myConnector = beginConnector;
-            OutputHomeLocations();
+            shipIOHandler.OutputHomeLocations();
         }
 
         public string updateHomeLocation(string argument, IMyShipConnector my_connected_connector)
@@ -278,25 +260,6 @@ namespace IngameScript
         }
 
 
-        void OutputHomeLocations()
-        {
-            Echo("\n   Home location Data:");
-            foreach (HomeLocation currentHomeLocation in homeLocations)
-            {
-                Echo("Station conn: " + currentHomeLocation.station_connector_name);
-                IMyShipConnector my_connector = (IMyShipConnector)GridTerminalSystem.GetBlockWithId(currentHomeLocation.my_connector_ID);
-                Echo("Ship conn: " + my_connector.CustomName);
-                string argStr = "ARGS: ";
-                foreach (string arg in currentHomeLocation.arguments)
-                {
-                    argStr += arg + ", ";
-                }
-                Echo(argStr + "\n");
-
-            }
-        }
-
-
 
         /// <summary>
         /// Equivalent to "Update()" from Unity but specifically for the docking sequence.
@@ -318,10 +281,6 @@ namespace IngameScript
             var ForceToApply = (new Vector3D(xForce, yForce, zForce) - CurrentFeltForce) * systemsAnalyzer.shipMass;
 
             //shipIOHandler.Echo ("Force to apply: " + ForceToApply.Length ().ToString ("0,0"));
-
-
-
-
 
 
 
