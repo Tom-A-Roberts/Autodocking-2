@@ -268,49 +268,88 @@ namespace IngameScript
         {
                 //AlignWithGravity();
                 var velocity = systemsAnalyzer.cockpit.GetShipVelocities().LinearVelocity;
-                float m = 1;
-                SetResultantAcceleration(-(float)velocity.X * m, -(float)velocity.Y * m, -(float)velocity.Z * m);
+
+
+                SetResultantAcceleration(new Vector3D(0,1,0)); // NORMALIZED!
         }
 
 
-        void SetResultantAcceleration(float xForce, float yForce, float zForce)
+        void SetResultantAcceleration(Vector3D TargetForceDirection)
         {
             var UnknownForces = Vector3.Zero;
             var Gravity_And_Unknown_Forces = systemsAnalyzer.cockpit.GetTotalGravity() + UnknownForces;
             var Gravity_And_Unknown_Forces_Length = Gravity_And_Unknown_Forces.Length();
-
-            var ForceToApply = (new Vector3D(xForce, yForce, zForce) - Gravity_And_Unknown_Forces) * systemsAnalyzer.shipMass;
-
-            // The FINAL force direction (aka, towards the connector)
-            Vector3D ForceDirection = Vector3D.Normalize(ForceToApply);
-
-            ShipSystemsAnalyzer.ThrusterForceAnalysis thrusterAnalysis = new ShipSystemsAnalyzer.ThrusterForceAnalysis(
-                ForceDirection, systemsAnalyzer.myConnector, systemsAnalyzer);
+            var ForceRequired = Gravity_And_Unknown_Forces * systemsAnalyzer.shipMass;
 
 
-            //ForceToApply = ForceDirection * thrusterAnalysis.maxAvailableThrustInDirection;
+            systemsAnalyzer.UpdateThrusterGroupsWorldDirections();
+
+            ThrusterGroup[] thrusterGroupsToUse = systemsAnalyzer.FindThrusterGroupsInDirection(ForceRequired);
+
+            double[] thrusterGroupsPower = systemsAnalyzer.CalculateThrusterGroupsPower(ForceRequired, thrusterGroupsToUse);
+
+            shipIOHandler.Echo(thrusterGroupsPower[0]);
+            shipIOHandler.Echo(thrusterGroupsPower[1]);
+            shipIOHandler.Echo(thrusterGroupsPower[2]);
+
+            foreach (KeyValuePair<Base6Directions.Direction, ThrusterGroup> entry in systemsAnalyzer.thrusterGroups)
+            {
+                systemsController.SetThrusterForces(entry.Value, 0);
+            }
+            systemsController.SetThrusterForces(thrusterGroupsToUse[0], thrusterGroupsPower[0]);
+            systemsController.SetThrusterForces(thrusterGroupsToUse[1], thrusterGroupsPower[1]);
+            systemsController.SetThrusterForces(thrusterGroupsToUse[2], thrusterGroupsPower[2]);
+
+            //shipIOHandler.Echo(systemsAnalyzer.ForwardThrust.Thrusters[0].DisplayNameText);
+            //shipIOHandler.Echo(systemsAnalyzer.UpThrust.Thrusters[0].DisplayNameText);
+            //shipIOHandler.Echo(systemsAnalyzer.LeftThrust.Thrusters[0].DisplayNameText);
+            //shipIOHandler.Echo(systemsAnalyzer.ForwardThrust.WorldThrustDirection);
+            //shipIOHandler.Echo(systemsAnalyzer.ForwardThrust.LocalThrustDirection);
 
 
-            double ForwardThrustToApply = 0;
-            double LeftThrustToApply = 0;
-            double UpThrustToApply = 0;
-
-            var mat = new double[,] {
-                { thrusterAnalysis.thrustForward.X, thrusterAnalysis.thrustLeft.X, thrusterAnalysis.thrustUp.X }, 
-                { thrusterAnalysis.thrustForward.Y, thrusterAnalysis.thrustLeft.Y, thrusterAnalysis.thrustUp.Y }, 
-                { thrusterAnalysis.thrustForward.Z, thrusterAnalysis.thrustLeft.Z, thrusterAnalysis.thrustUp.Z },
-            };
-
-            var ans = new double[] { ForceToApply.X, ForceToApply.Y, ForceToApply.Z };
-            PID.ComputeCoefficients(mat, ans);
 
 
-            ForwardThrustToApply = ans[0];
-            LeftThrustToApply = ans[1];
-            UpThrustToApply = ans[2];
 
-            systemsController.SetThrusterForces(thrusterAnalysis, ForwardThrustToApply, LeftThrustToApply, UpThrustToApply);
+            //ShipSystemsAnalyzer.ThrusterForceAnalysis thrusterAnalysis = new ShipSystemsAnalyzer.ThrusterForceAnalysis(
+            //    ForceDirection, systemsAnalyzer.myConnector, systemsAnalyzer);
 
+
+
+            //var EstimatedForce = (TargetForceDirection - Gravity_And_Unknown_Forces) * systemsAnalyzer.shipMass;
+
+            //// The FINAL force direction (aka, towards the connector)
+            //Vector3D ForceDirection = Vector3D.Normalize(ForceToApply);
+
+            //ShipSystemsAnalyzer.ThrusterForceAnalysis thrusterAnalysis = new ShipSystemsAnalyzer.ThrusterForceAnalysis(
+            //    ForceDirection, systemsAnalyzer.myConnector, systemsAnalyzer);
+
+
+            ////thrusterAnalysis.ForceForwardThrusters[0].
+
+
+
+            //double ForwardThrustToApply = 0;
+            //double LeftThrustToApply = 0;
+            //double UpThrustToApply = 0;
+
+            //var mat = new double[,] {
+            //    { thrusterAnalysis.thrustForward.X, thrusterAnalysis.thrustLeft.X, thrusterAnalysis.thrustUp.X }, 
+            //    { thrusterAnalysis.thrustForward.Y, thrusterAnalysis.thrustLeft.Y, thrusterAnalysis.thrustUp.Y }, 
+            //    { thrusterAnalysis.thrustForward.Z, thrusterAnalysis.thrustLeft.Z, thrusterAnalysis.thrustUp.Z },
+            //};
+
+            //var ans = new double[] { ForceToApply.X, ForceToApply.Y, ForceToApply.Z };
+            //PID.ComputeCoefficients(mat, ans);
+
+
+            //ForwardThrustToApply = ans[0];
+            //LeftThrustToApply = ans[1];
+            //UpThrustToApply = ans[2];
+
+            //systemsController.SetThrusterForces(thrusterAnalysis, ForwardThrustToApply, LeftThrustToApply, UpThrustToApply);
+
+
+            shipIOHandler.EchoFinish(false);
         }
 
 
