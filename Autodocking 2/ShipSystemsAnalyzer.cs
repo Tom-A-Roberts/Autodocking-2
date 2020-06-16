@@ -335,11 +335,11 @@ namespace IngameScript
                 {
                     ans[0] = relevantThrustGroups[0].MaxThrust;
                 }
-                else if (ans[1] > relevantThrustGroups[1].MaxThrust)
+                if (ans[1] > relevantThrustGroups[1].MaxThrust)
                 {
                     ans[1] = relevantThrustGroups[1].MaxThrust;
                 }
-                else if (ans[2] > relevantThrustGroups[2].MaxThrust)
+                if (ans[2] > relevantThrustGroups[2].MaxThrust)
                 {
                     ans[2] = relevantThrustGroups[2].MaxThrust;
                 }
@@ -405,6 +405,14 @@ namespace IngameScript
                 //totalThrusterForce += Vector3D.Normalize(thrusterGroupsToUse[2].WorldThrustDirection) * thrustCoefficients[2];
                 //return totalThrusterForce;
 
+            }
+            public Vector3D FindActualForceFromThrusters(ThrusterGroup[] thrusterGroupsToUse, double[] thrustCoefficients)
+            {
+                Vector3D totalThrusterForce = Vector3D.Zero;
+                totalThrusterForce += Vector3D.Normalize(thrusterGroupsToUse[0].WorldThrustDirection) * thrustCoefficients[0];
+                totalThrusterForce += Vector3D.Normalize(thrusterGroupsToUse[1].WorldThrustDirection) * thrustCoefficients[1];
+                totalThrusterForce += Vector3D.Normalize(thrusterGroupsToUse[2].WorldThrustDirection) * thrustCoefficients[2];
+                return totalThrusterForce;
             }
             //public double FindMaxAvailableThrustInDirectionAfterGravity(Vector3D thrust_direction)
             //{
