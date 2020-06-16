@@ -26,6 +26,15 @@ namespace IngameScript
             readonly Program parent_program;
             private string echoLine = "";
 
+            public static double RoundToSignificantDigits(double d, int digits)
+            {
+                if (d == 0)
+                    return 0;
+
+                double scale = Math.Pow(10, Math.Floor(Math.Log10(Math.Abs(d))) + 1);
+                return scale * Math.Round(d / scale, digits);
+            }
+
             public IOHandler(Program _parent_program)
             {
                 parent_program = _parent_program;
@@ -64,7 +73,7 @@ namespace IngameScript
             /// False (default) - Output to both the programming block and an LCD with the name "LCD Panel".
             /// </summary>
             /// <param name="OnlyInProgrammingBlock">Defines where the output will be shown</param>
-            public void EchoFinish(bool OnlyInProgrammingBlock = false)
+            public void EchoFinish(bool OnlyInProgrammingBlock = false, float fontSize = 1)
             {
                 if (echoLine != "")
                 {
@@ -75,7 +84,7 @@ namespace IngameScript
                         if (surface != null)
                         {
                             surface.ContentType = ContentType.TEXT_AND_IMAGE;
-                            surface.FontSize = 1;
+                            surface.FontSize = fontSize;
                             surface.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
                             surface.WriteText(echoLine);
                         }
@@ -129,6 +138,7 @@ namespace IngameScript
                 }
 
             }
+
         }
     }
 }

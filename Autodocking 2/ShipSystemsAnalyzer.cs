@@ -331,16 +331,36 @@ namespace IngameScript
 
                 var ans = new double[] { WorldDirectionForce.X, WorldDirectionForce.Y, WorldDirectionForce.Z };
                 PID.ComputeCoefficients(mat, ans);
-
+                if (ans[0] > relevantThrustGroups[0].MaxThrust)
+                {
+                    ans[0] = relevantThrustGroups[0].MaxThrust;
+                }
+                else if (ans[1] > relevantThrustGroups[1].MaxThrust)
+                {
+                    ans[1] = relevantThrustGroups[1].MaxThrust;
+                }
+                else if (ans[2] > relevantThrustGroups[2].MaxThrust)
+                {
+                    ans[2] = relevantThrustGroups[2].MaxThrust;
+                }
                 return ans;
             }
-
+            /// <summary>
+            /// Finds the thrust (Newtons) available in the ship after gravity is accounted for. <br />
+            /// The leftover thrusts must be up to-date: PopulateThrusterGroupsLeftoverThrust()
+            /// </summary>
+            /// <param name="thrust_direction"></param>
+            /// <returns></returns>
             public double FindMaxAvailableThrustInDirection(Vector3D thrust_direction)
             {
                 ThrusterGroup[] relevantThrusterGroups = FindThrusterGroupsInDirection(thrust_direction);
                 double a = relevantThrusterGroups[0].LeftoverThrust;
                 double b = relevantThrusterGroups[1].LeftoverThrust;
                 double c = relevantThrusterGroups[2].LeftoverThrust;
+
+                //parent_program.shipIOHandler.Echo(relevantThrusterGroups[0].LocalThrustDirection.ToString() + ": " + IOHandler.RoundToSignificantDigits(a / 1000, 3).ToString() + " kN");
+                //parent_program.shipIOHandler.Echo(relevantThrusterGroups[1].LocalThrustDirection.ToString() + ": " + IOHandler.RoundToSignificantDigits(b / 1000, 3).ToString() + " kN");
+                //parent_program.shipIOHandler.Echo(relevantThrusterGroups[2].LocalThrustDirection.ToString() + ": " + IOHandler.RoundToSignificantDigits(c / 1000, 3).ToString() + " kN");
 
                 double a1 = thrust_direction.X;
                 double a2 = thrust_direction.Y;
@@ -352,8 +372,46 @@ namespace IngameScript
 
                 double max = Math.Max(Math.Max(Alpha, Beta), Gamma);
                 double t = 1 / max;
+                //parent_program.shipIOHandler.Echo("t: " + t.ToString());
                 return (t * Vector3D.Normalize(thrust_direction)).Length();
             }
+
+            public void PopulateThrusterGroupsLeftoverThrust(Vector3D Gravity_And_Unknown_Force)
+            {
+
+
+                ThrusterGroup[] gravityThrusterGroupsToUse = FindThrusterGroupsInDirection(Gravity_And_Unknown_Force);
+
+                double[] thrustsNeededForGravityAndUnknown = CalculateThrusterGroupsPower(Gravity_And_Unknown_Force, gravityThrusterGroupsToUse);
+
+                gravityThrusterGroupsToUse[0].LeftoverThrust = gravityThrusterGroupsToUse[0].MaxThrust - thrustsNeededForGravityAndUnknown[0];
+                gravityThrusterGroupsToUse[1].LeftoverThrust = gravityThrusterGroupsToUse[1].MaxThrust - thrustsNeededForGravityAndUnknown[1];
+                gravityThrusterGroupsToUse[2].LeftoverThrust = gravityThrusterGroupsToUse[2].MaxThrust - thrustsNeededForGravityAndUnknown[2];
+
+                gravityThrusterGroupsToUse[3].LeftoverThrust = gravityThrusterGroupsToUse[3].MaxThrust;
+                gravityThrusterGroupsToUse[4].LeftoverThrust = gravityThrusterGroupsToUse[4].MaxThrust;
+                gravityThrusterGroupsToUse[5].LeftoverThrust = gravityThrusterGroupsToUse[5].MaxThrust;
+            }
+
+            public double FindAmountOfForceInDirection(Vector3D TotalForce, Vector3D componentDirection)
+            {
+
+                double componentDirectionLength = componentDirection.Length();
+                Vector3D projectedVector = (TotalForce.Dot(componentDirection) / componentDirectionLength) * (componentDirection / componentDirection.Length());
+                return projectedVector.Length();
+                //Vector3D totalThrusterForce = Vector3D.Zero;
+                //totalThrusterForce += Vector3D.Normalize(thrusterGroupsToUse[0].WorldThrustDirection) * thrustCoefficients[0];
+                //totalThrusterForce += Vector3D.Normalize(thrusterGroupsToUse[1].WorldThrustDirection) * thrustCoefficients[1];
+                //totalThrusterForce += Vector3D.Normalize(thrusterGroupsToUse[2].WorldThrustDirection) * thrustCoefficients[2];
+                //return totalThrusterForce;
+
+            }
+            //public double FindMaxAvailableThrustInDirectionAfterGravity(Vector3D thrust_direction)
+            //{
+
+
+            //    return FindMaxAvailableThrustInDirection(thrust_direction);
+            //}
 
 
             #region Methods
