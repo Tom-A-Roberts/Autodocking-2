@@ -2,6 +2,7 @@
 using Sandbox.ModAPI.Interfaces;
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using VRage.Game.GUI.TextPanel;
 using VRageMath;
 
@@ -268,49 +269,73 @@ namespace IngameScript
         {
                 //AlignWithGravity();
                 var velocity = systemsAnalyzer.cockpit.GetShipVelocities().LinearVelocity;
-                float m = 1;
-                SetResultantAcceleration(-(float)velocity.X * m, -(float)velocity.Y * m, -(float)velocity.Z * m);
+
+
+                SetResultantAcceleration(Vector3D.Normalize(-systemsAnalyzer.cockpit.WorldMatrix.Forward + systemsAnalyzer.cockpit.WorldMatrix.Right - systemsAnalyzer.cockpit.WorldMatrix.Up));
         }
 
 
-        void SetResultantAcceleration(float xForce, float yForce, float zForce)
+        void SetResultantAcceleration(Vector3D TargetForceDirection)
         {
-            var UnknownForces = Vector3.Zero;
-            var Gravity_And_Unknown_Forces = systemsAnalyzer.cockpit.GetTotalGravity() + UnknownForces;
-            var Gravity_And_Unknown_Forces_Length = Gravity_And_Unknown_Forces.Length();
+            systemsAnalyzer.UpdateThrusterGroupsWorldDirections();
 
-            var ForceToApply = (new Vector3D(xForce, yForce, zForce) - Gravity_And_Unknown_Forces) * systemsAnalyzer.shipMass;
+            var UnknownAcceleration = Vector3.Zero;
+            var Gravity_And_Unknown_Forces = (systemsAnalyzer.cockpit.GetTotalGravity() + UnknownAcceleration) * systemsAnalyzer.shipMass;
 
-            // The FINAL force direction (aka, towards the connector)
-            Vector3D ForceDirection = Vector3D.Normalize(ForceToApply);
+            double maxPossibleThrust =
+                Math.Max(systemsAnalyzer.ForwardThrust.MaxThrust,
+                Math.Max(systemsAnalyzer.UpThrust.MaxThrust,
+                Math.Max(systemsAnalyzer.LeftThrust.MaxThrust,
+                Math.Max(systemsAnalyzer.BackwardThrust.MaxThrust,
+                Math.Max(systemsAnalyzer.RightThrust.MaxThrust,systemsAnalyzer.DownThrust.MaxThrust)))));
+;
 
-            ShipSystemsAnalyzer.ThrusterForceAnalysis thrusterAnalysis = new ShipSystemsAnalyzer.ThrusterForceAnalysis(
-                ForceDirection, systemsAnalyzer.myConnector, systemsAnalyzer);
+            //double t = systemsAnalyzer.cockpit.GetShipVelocities().LinearVelocity.Length() / (maxAvailableThrustInTargetDirection / 1000);
+            //shipIOHandler.Echo(IOHandler.RoundToSignificantDigits(t * 1000, 3));
 
+            
 
-            //ForceToApply = ForceDirection * thrusterAnalysis.maxAvailableThrustInDirection;
-
-
-            double ForwardThrustToApply = 0;
-            double LeftThrustToApply = 0;
-            double UpThrustToApply = 0;
-
-            var mat = new double[,] {
-                { thrusterAnalysis.thrustForward.X, thrusterAnalysis.thrustLeft.X, thrusterAnalysis.thrustUp.X }, 
-                { thrusterAnalysis.thrustForward.Y, thrusterAnalysis.thrustLeft.Y, thrusterAnalysis.thrustUp.Y }, 
-                { thrusterAnalysis.thrustForward.Z, thrusterAnalysis.thrustLeft.Z, thrusterAnalysis.thrustUp.Z },
-            };
-
-            var ans = new double[] { ForceToApply.X, ForceToApply.Y, ForceToApply.Z };
-            PID.ComputeCoefficients(mat, ans);
+            systemsAnalyzer.PopulateThrusterGroupsLeftoverThrust(Gravity_And_Unknown_Forces);
+            double maxAvailableThrustInTargetDirection = systemsAnalyzer.FindMaxAvailableThrustInDirection(Vector3D.Normalize(TargetForceDirection));
 
 
-            ForwardThrustToApply = ans[0];
-            LeftThrustToApply = ans[1];
-            UpThrustToApply = ans[2];
+            Vector3D TargetForce = ((Vector3D.Normalize(TargetForceDirection) * maxAvailableThrustInTargetDirection * 0.1) + Gravity_And_Unknown_Forces);
+            //Vector3D FinalForce = Gravity_And_Unknown_Forces;
 
-            systemsController.SetThrusterForces(thrusterAnalysis, ForwardThrustToApply, LeftThrustToApply, UpThrustToApply);
+            double ForceInDirection = systemsAnalyzer.FindAmountOfForceInDirection(TargetForce, TargetForceDirection);
 
+
+
+            //shipIOHandler.Echo("Max available forward:");
+            //shipIOHandler.Echo(IOHandler.RoundToSignificantDigits(maxPossibleThrust / 1000, 3));
+
+
+            ThrusterGroup[] thrusterGroupsToUse = systemsAnalyzer.FindThrusterGroupsInDirection(TargetForce);
+            double[] thrustsNeededOverall = systemsAnalyzer.CalculateThrusterGroupsPower(TargetForce, thrusterGroupsToUse);
+
+
+            Vector3D ActualPossibleForce = systemsAnalyzer.FindActualForceFromThrusters(thrusterGroupsToUse, thrustsNeededOverall);
+            Vector3D ForceCorrected = ActualPossibleForce - Gravity_And_Unknown_Forces;
+            double dot = Vector3D.Normalize(ForceCorrected).Dot(Vector3D.Normalize(TargetForceDirection));
+            shipIOHandler.Echo("Dot: " + dot.ToString());
+
+
+
+            shipIOHandler.Echo("1: " + (thrustsNeededOverall[0] / thrusterGroupsToUse[0].MaxThrust).ToString());
+            shipIOHandler.Echo("2: " + (thrustsNeededOverall[1] / thrusterGroupsToUse[1].MaxThrust).ToString());
+            shipIOHandler.Echo("3: " + (thrustsNeededOverall[2] / thrusterGroupsToUse[2].MaxThrust).ToString());
+
+            // Set unused thrusters to 0
+            systemsController.SetThrusterForces(thrusterGroupsToUse[3], 0);
+            systemsController.SetThrusterForces(thrusterGroupsToUse[4], 0);
+            systemsController.SetThrusterForces(thrusterGroupsToUse[5], 0);
+
+            // Set used thrusters to their values
+            systemsController.SetThrusterForces(thrusterGroupsToUse[0], thrustsNeededOverall[0]);
+            systemsController.SetThrusterForces(thrusterGroupsToUse[1], thrustsNeededOverall[1]);
+            systemsController.SetThrusterForces(thrusterGroupsToUse[2], thrustsNeededOverall[2]);
+
+            shipIOHandler.EchoFinish(false, 1.6f);
         }
 
 
