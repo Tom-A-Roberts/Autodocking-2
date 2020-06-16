@@ -271,8 +271,9 @@ namespace IngameScript
 
             public ThrusterGroup[] FindThrusterGroupsInDirection(Vector3D _WorldDirection)
             {
-                ThrusterGroup[] OutputGroup = new ThrusterGroup[3];
+                ThrusterGroup[] OutputGroup = new ThrusterGroup[6];
                 List<ThrusterGroup> AccumulatorGroup = new List<ThrusterGroup>();
+                List<ThrusterGroup> OtherGroup = new List<ThrusterGroup>();
                 Vector3D WorldDirection = Vector3D.Normalize(_WorldDirection);
                 foreach (KeyValuePair<Base6Directions.Direction, ThrusterGroup> entry in thrusterGroups)
                 {
@@ -280,6 +281,10 @@ namespace IngameScript
                     if (currentThrusterGroup.WorldThrustDirection.Dot(WorldDirection) > 0)
                     {
                         AccumulatorGroup.Add(currentThrusterGroup);
+                    }
+                    else
+                    {
+                        OtherGroup.Add(currentThrusterGroup);
                     }
                 }
                 if(AccumulatorGroup.Count > 3)
@@ -294,6 +299,10 @@ namespace IngameScript
                             return 1;
                         }
                     });
+                    for (int i = 3; i < AccumulatorGroup.Count; i++)
+                    {
+                        OtherGroup.Add(AccumulatorGroup[i]);
+                    }
                     parent_program.shipIOHandler.Echo("Warning, more than 3 viable thruster groups found! removing extra ones");
                 }
                 if(AccumulatorGroup.Count < 3)
@@ -303,6 +312,11 @@ namespace IngameScript
                 OutputGroup[0] = AccumulatorGroup[0];
                 OutputGroup[1] = AccumulatorGroup[1];
                 OutputGroup[2] = AccumulatorGroup[2];
+                // BELOW ARE UNUSED GROUPS!
+                OutputGroup[3] = OtherGroup[0];
+                OutputGroup[4] = OtherGroup[1];
+                OutputGroup[5] = OtherGroup[2];
+
                 return OutputGroup;
             }
 
@@ -319,6 +333,26 @@ namespace IngameScript
                 PID.ComputeCoefficients(mat, ans);
 
                 return ans;
+            }
+
+            public double FindMaxAvailableThrustInDirection(Vector3D thrust_direction)
+            {
+                ThrusterGroup[] relevantThrusterGroups = FindThrusterGroupsInDirection(thrust_direction);
+                double a = relevantThrusterGroups[0].LeftoverThrust;
+                double b = relevantThrusterGroups[1].LeftoverThrust;
+                double c = relevantThrusterGroups[2].LeftoverThrust;
+
+                double a1 = thrust_direction.X;
+                double a2 = thrust_direction.Y;
+                double a3 = thrust_direction.Z;
+
+                double Alpha = a1 / a;
+                double Beta = a2 / b;
+                double Gamma = a3 / c;
+
+                double max = Math.Max(Math.Max(Alpha, Beta), Gamma);
+                double t = 1 / max;
+                return (t * Vector3D.Normalize(thrust_direction)).Length();
             }
 
 
@@ -551,6 +585,10 @@ namespace IngameScript
             /// Force In Newtons
             /// </summary>
             public double MaxThrust;
+            /// <summary>
+            /// Thrust leftover, after gravity + unknown forces are accounted for
+            /// </summary>
+            public double LeftoverThrust = 0;
             
             public ThrusterGroup(Program _parent_program, Base6Directions.Direction direction)
             {
