@@ -107,6 +107,20 @@ namespace IngameScript
                     }
                 }
             }
+            public static void Invert(ref Matrix3x3 matrix, out Matrix3x3 result)
+            {
+                float num = matrix.Determinant();
+                float num2 = 1f / num;
+                result.M11 = (matrix.M22 * matrix.M33 - matrix.M32 * matrix.M23) * num2;
+                result.M12 = (matrix.M13 * matrix.M32 - matrix.M12 * matrix.M33) * num2;
+                result.M13 = (matrix.M12 * matrix.M23 - matrix.M13 * matrix.M22) * num2;
+                result.M21 = (matrix.M23 * matrix.M31 - matrix.M21 * matrix.M33) * num2;
+                result.M22 = (matrix.M11 * matrix.M33 - matrix.M13 * matrix.M31) * num2;
+                result.M23 = (matrix.M21 * matrix.M13 - matrix.M11 * matrix.M23) * num2;
+                result.M31 = (matrix.M21 * matrix.M32 - matrix.M31 * matrix.M22) * num2;
+                result.M32 = (matrix.M31 * matrix.M12 - matrix.M11 * matrix.M32) * num2;
+                result.M33 = (matrix.M11 * matrix.M22 - matrix.M21 * matrix.M12) * num2;
+            }
 
             public PID(double kP, double kI, double kD, double lowerBound, double upperBound, double timeStep)
             {
