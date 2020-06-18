@@ -273,17 +273,7 @@ namespace IngameScript
 
 
 
-
-
             
-
-
-
-
-
-
-
-
 
 
 
@@ -293,12 +283,20 @@ namespace IngameScript
 
             Vector3D FinalForce = Gravity_And_Unknown_Forces;
             ThrusterGroup[] thrusterGroupsToUse = systemsAnalyzer.FindThrusterGroupsInDirection(Gravity_And_Unknown_Forces);
-            double[] thrustsNeededOverall = systemsAnalyzer.CalculateThrusterGroupsPower(Gravity_And_Unknown_Forces, thrusterGroupsToUse);
+            //double[] thrustsNeededOverall = systemsAnalyzer.CalculateThrusterGroupsPower(Gravity_And_Unknown_Forces, thrusterGroupsToUse);
+            systemsAnalyzer.CalculateThrusterGroupsPower2(Gravity_And_Unknown_Forces, thrusterGroupsToUse);
+            
 
 
-            //shipIOHandler.Echo("1: " + (thrustsNeededOverall[0] / thrusterGroupsToUse[0].MaxThrust).ToString());
-            //shipIOHandler.Echo("2: " + (thrustsNeededOverall[1] / thrusterGroupsToUse[1].MaxThrust).ToString());
-            //shipIOHandler.Echo("3: " + (thrustsNeededOverall[2] / thrusterGroupsToUse[2].MaxThrust).ToString());
+            systemsAnalyzer.SolveMaxThrust(Gravity_And_Unknown_Forces, TargetForceDirection);
+            thrusterGroupsToUse = systemsAnalyzer.thrusterGroupsToUse;
+
+
+            //shipIOHandler.Echo("1: " + (thrustsNeededOverall.X / thrusterGroupsToUse[0].MaxThrust).ToString());
+            //shipIOHandler.Echo("2: " + (thrustsNeededOverall.Y / thrusterGroupsToUse[1].MaxThrust).ToString());
+            //shipIOHandler.Echo("3: " + (thrustsNeededOverall.Z / thrusterGroupsToUse[2].MaxThrust).ToString());
+
+            Vector3D thrustsNeededOverall = systemsAnalyzer.returnValues;
 
             // Set unused thrusters to 0
             systemsController.SetThrusterForces(thrusterGroupsToUse[3], 0);
@@ -306,9 +304,12 @@ namespace IngameScript
             systemsController.SetThrusterForces(thrusterGroupsToUse[5], 0);
 
             // Set used thrusters to their values
-            systemsController.SetThrusterForces(thrusterGroupsToUse[0], thrustsNeededOverall[0]);
-            systemsController.SetThrusterForces(thrusterGroupsToUse[1], thrustsNeededOverall[1]);
-            systemsController.SetThrusterForces(thrusterGroupsToUse[2], thrustsNeededOverall[2]);
+            systemsController.SetThrusterForces(thrusterGroupsToUse[0], thrusterGroupsToUse[0].finalThrustForces.X);
+            systemsController.SetThrusterForces(thrusterGroupsToUse[1], thrusterGroupsToUse[0].finalThrustForces.Y);
+            systemsController.SetThrusterForces(thrusterGroupsToUse[2], thrusterGroupsToUse[0].finalThrustForces.Z);
+            //systemsController.SetThrusterForces(thrusterGroupsToUse[0], thrustsNeededOverall.X);
+            //systemsController.SetThrusterForces(thrusterGroupsToUse[1], thrustsNeededOverall.Y);
+            //systemsController.SetThrusterForces(thrusterGroupsToUse[2], thrustsNeededOverall.Z);
 
             shipIOHandler.EchoFinish(false, 1.6f);
 
