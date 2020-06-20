@@ -56,6 +56,13 @@ namespace IngameScript
                 EchoFinish(false);
             }
 
+            public void WritePastableCoords(Vector3D coords, string coord_name = "0")
+            {
+                //GPS:Spug #1:53571.5:-26605.41:12103.89:
+                Echo("GPS:" + coord_name + ":" + coords.X.ToString() + ":" + coords.Y.ToString() + ":" + coords.Z.ToString() + ":");
+            }
+
+
             /// <summary>
             /// Adds the input string (or object) to an accumulated line.<br />
             /// Use EchoFinish to output this accumulated line to the user.

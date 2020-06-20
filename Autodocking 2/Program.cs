@@ -262,7 +262,9 @@ namespace IngameScript
 
             //SetResultantAcceleration(Vector3D.Normalize(-systemsAnalyzer.cockpit.WorldMatrix.Forward + systemsAnalyzer.cockpit.WorldMatrix.Left));
             //systemsAnalyzer.cockpit.WorldMatrix.Forward
-            SetResultantAcceleration(new Vector3D(-0.8776,0.436,-0.1988));
+
+            //Direction is up and slightly backwards
+            SetResultantAcceleration(Vector3D.Normalize(new Vector3D(-1,1,-0.5)));
         }
 
 
@@ -278,35 +280,35 @@ namespace IngameScript
             bool use_new_method = true;
 
 
-
-            ThrusterGroup maxForceThrusterGroup = systemsAnalyzer.SolveMaxThrust(Gravity_And_Unknown_Forces, -TargetForceDirection);
+            
+            ThrusterGroup maxForceThrusterGroup = systemsAnalyzer.SolveMaxThrust(-Gravity_And_Unknown_Forces, -TargetForceDirection);
 
             // Output rating system:
             if (maxForceThrusterGroup != null)
             {
                 Vector3D resultantDirection = systemsAnalyzer.FindActualForceFromThrusters(maxForceThrusterGroup);
-                Vector3D resultantNoGrav = resultantDirection - Gravity_And_Unknown_Forces;
-                double dot_rating = Vector3D.Dot(Vector3D.Normalize(TargetForceDirection), Vector3D.Normalize(resultantNoGrav));
-                shipIOHandler.Echo("Dot Rating: " + IOHandler.RoundToSignificantDigits(dot_rating, 3).ToString());
+                Vector3D resultantNoGravA = systemsAnalyzer.cockpit.GetShipVelocities().LinearVelocity;//resultantDirection - Gravity_And_Unknown_Forces;
+                Vector3D resultantNoGravT = resultantDirection + Gravity_And_Unknown_Forces;
+                double dot_ratingA = Vector3D.Dot(Vector3D.Normalize(TargetForceDirection), Vector3D.Normalize(resultantNoGravA));
+                double dot_ratingT = Vector3D.Dot(Vector3D.Normalize(TargetForceDirection), Vector3D.Normalize(resultantNoGravT));
+                shipIOHandler.Echo("Dot Actual: " + IOHandler.RoundToSignificantDigits(dot_ratingA, 3).ToString());
+                shipIOHandler.Echo("Dot Theory: " + IOHandler.RoundToSignificantDigits(dot_ratingT, 3).ToString());
+                //shipIOHandler.WritePastableCoords(systemsAnalyzer.cockpit.GetPosition() + systemsAnalyzer.cockpit.WorldMatrix.Forward, "Cockpit forward");
+                //shipIOHandler.WritePastableCoords(systemsAnalyzer.cockpit.GetPosition() + systemsAnalyzer.cockpit.WorldMatrix.Up, "Cockpit up");
+                //shipIOHandler.WritePastableCoords(systemsAnalyzer.cockpit.GetPosition() + systemsAnalyzer.cockpit.WorldMatrix.Left, "Cockpit left");
+
+
+
+                //shipIOHandler.WritePastableCoords(systemsAnalyzer.cockpit.GetPosition() + -TargetForceDirection * 5, "Target direction");
+                //shipIOHandler.WritePastableCoords(systemsAnalyzer.cockpit.GetPosition() + Vector3D.Normalize(resultantDirection) * 5, "resultant direction");
+                //shipIOHandler.WritePastableCoords(systemsAnalyzer.cockpit.GetPosition() + Vector3D.Normalize(resultantNoGravT) * 5, "resultant no grav");
+
             }
             else
             {
                 shipIOHandler.Echo("Dot Rating: ERROR");
                 use_new_method = false;
             }
-
-
-            //shipIOHandler.Echo(systemsAnalyzer.ErrorString);
-
-            //foreach (IMyThrust thrust in systemsAnalyzer.thrusterGroups[Base6Directions.Direction.Forward].thrusters)
-            //{
-            //    shipIOHandler.Echo(thrust.CustomName);
-            //}
-            shipIOHandler.Echo("Up: " + systemsAnalyzer.thrusterGroups[Base6Directions.Direction.Up].thrusters[0].CustomName);
-            shipIOHandler.Echo("Down: " + systemsAnalyzer.thrusterGroups[Base6Directions.Direction.Down].thrusters[0].CustomName);
-            shipIOHandler.Echo("Left: " + systemsAnalyzer.thrusterGroups[Base6Directions.Direction.Left].thrusters[0].CustomName);
-            shipIOHandler.Echo("Forward: " + systemsAnalyzer.thrusterGroups[Base6Directions.Direction.Forward].thrusters[0].CustomName);
-            shipIOHandler.Echo("Backward: " + systemsAnalyzer.thrusterGroups[Base6Directions.Direction.Backward].thrusters[0].CustomName);
 
 
             if (use_new_method)
