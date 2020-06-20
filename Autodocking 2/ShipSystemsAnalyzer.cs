@@ -16,6 +16,7 @@ using VRage.Game.ObjectBuilders.Definitions;
 using VRage.Game;
 using VRage;
 using VRageMath;
+using VRage.Noise.Modifiers;
 
 namespace IngameScript
 {
@@ -60,69 +61,26 @@ namespace IngameScript
             }
 
 
-
-
-            public double[] CalculateThrusterGroupsPower(Vector3D WorldDirectionForce, ThrusterGroup[] relevantThrustGroups)
-            {
-                var mat = new double[,] {
-                    { relevantThrustGroups[0].WorldThrustDirection.X, relevantThrustGroups[1].WorldThrustDirection.X, relevantThrustGroups[2].WorldThrustDirection.X },
-                    { relevantThrustGroups[0].WorldThrustDirection.Y, relevantThrustGroups[1].WorldThrustDirection.Y, relevantThrustGroups[2].WorldThrustDirection.Y },
-                    { relevantThrustGroups[0].WorldThrustDirection.Z, relevantThrustGroups[1].WorldThrustDirection.Z, relevantThrustGroups[2].WorldThrustDirection.Z },
-                };
-
-                var ans = new double[] { WorldDirectionForce.X, WorldDirectionForce.Y, WorldDirectionForce.Z };
-                PID.ComputeCoefficients(mat, ans);
-                if (ans[0] > relevantThrustGroups[0].MaxThrust)
-                {
-                    ans[0] = relevantThrustGroups[0].MaxThrust;
-                }
-                if (ans[1] > relevantThrustGroups[1].MaxThrust)
-                {
-                    ans[1] = relevantThrustGroups[1].MaxThrust;
-                }
-                if (ans[2] > relevantThrustGroups[2].MaxThrust)
-                {
-                    ans[2] = relevantThrustGroups[2].MaxThrust;
-                }
-                return ans;
-            }
-
-            
-            public void CalculateThrusterGroupsPower2(Vector3D WorldDirectionForce, ThrusterGroup[] relevantThrustGroups)
-            {
-                //var mat = new double[,] {
-                //    { relevantThrustGroups[0].WorldThrustDirection.X, relevantThrustGroups[1].WorldThrustDirection.X, relevantThrustGroups[2].WorldThrustDirection.X },
-                //    { relevantThrustGroups[0].WorldThrustDirection.Y, relevantThrustGroups[1].WorldThrustDirection.Y, relevantThrustGroups[2].WorldThrustDirection.Y },
-                //    { relevantThrustGroups[0].WorldThrustDirection.Z, relevantThrustGroups[1].WorldThrustDirection.Z, relevantThrustGroups[2].WorldThrustDirection.Z },
-                //};
-                Matrix matrixM = Matrix.Identity;
-                matrixM.SetRow(0, new Vector4((float)relevantThrustGroups[0].WorldThrustDirection.X, (float)relevantThrustGroups[0].WorldThrustDirection.Y, (float)relevantThrustGroups[0].WorldThrustDirection.Z, 0));
-                matrixM.SetRow(1, new Vector4((float)relevantThrustGroups[1].WorldThrustDirection.X, (float)relevantThrustGroups[1].WorldThrustDirection.Y, (float)relevantThrustGroups[1].WorldThrustDirection.Z, 0));
-                matrixM.SetRow(2, new Vector4((float)relevantThrustGroups[2].WorldThrustDirection.X, (float)relevantThrustGroups[2].WorldThrustDirection.Y, (float)relevantThrustGroups[2].WorldThrustDirection.Z, 0));
-                matrixM.SetRow(3, new Vector4(0, 0, 0, 1));
-                Vector3D equalityValues = new Vector3D(WorldDirectionForce.X, WorldDirectionForce.Y, WorldDirectionForce.Z);
-                //Vector3D returnvalues = new Vector3D();
-
-                //SolveThrusterSimultaneousEquations(matrixM, equalityValues, Base6Directions.Direction.Forward);
-
-
-                //returnValues = Vector3D.TransformNormal(equalityValues, Matrix.Invert(matrixM));
-
-            }
-
-
-
-
-            public ThrusterGroup SolveMaxThrust(Vector3D g, Vector3D targetDirection)
+            public ThrusterGroup SolveMaxThrust(Vector3D g, Vector3D targetDirection, double maxPercentageThrustToUse = 1)
             {
                 Base6Directions.Direction actual2Di;
                 Base6Directions.Direction actual3Di;
-
+                double t2c = 0;
+                double t3c = 0;
+                double Lambda = 0;
+                ThrusterGroup t1;
+                ThrusterGroup t2;
+                ThrusterGroup t3;
+                if (maxPercentageThrustToUse > 1)
+                {
+                    maxPercentageThrustToUse = 1;
+                }else if(maxPercentageThrustToUse < 0)
+                {
+                    maxPercentageThrustToUse = 0;
+                }
                 foreach (KeyValuePair<Base6Directions.Direction, ThrusterGroup> entry in thrusterGroups)
                 {
-                    ThrusterGroup t1 = entry.Value;
-                    ThrusterGroup t2;
-                    ThrusterGroup t3;
+                    t1 = entry.Value;
 
                     if (t1.LocalThrustDirection == Base6Directions.Direction.Up || t1.LocalThrustDirection == Base6Directions.Direction.Down)
                     {
@@ -146,42 +104,33 @@ namespace IngameScript
                         t3 = thrusterGroups[Base6Directions.Direction.Left];
                     }
 
-                    // WORKING VERSION
-                    var mat = new double[,] {
-                    { t2.WorldThrustDirection.X, t3.WorldThrustDirection.X, -targetDirection.X },
-                    { t2.WorldThrustDirection.Y, t3.WorldThrustDirection.Y, -targetDirection.Y },
-                    { t2.WorldThrustDirection.Z, t3.WorldThrustDirection.Z, -targetDirection.Z },
-                    };
+                    //var mat = new double[,] {
+                    //{ t2.WorldThrustDirection.X, t3.WorldThrustDirection.X, -targetDirection.X },
+                    //{ t2.WorldThrustDirection.Y, t3.WorldThrustDirection.Y, -targetDirection.Y },
+                    //{ t2.WorldThrustDirection.Z, t3.WorldThrustDirection.Z, -targetDirection.Z },
+                    //};
+                    t1.matrixM[0, 0] = t2.WorldThrustDirection.X;
+                    t1.matrixM[0, 1] = t3.WorldThrustDirection.X;
+                    t1.matrixM[0, 2] = -targetDirection.X;
 
-                    var ans = new double[] { (-t1.MaxThrust * t1.WorldThrustDirection.X) + g.X,
-                                             (-t1.MaxThrust * t1.WorldThrustDirection.Y) + g.Y,
-                                             (-t1.MaxThrust * t1.WorldThrustDirection.Z) + g.Z };
+                    t1.matrixM[1, 0] = t2.WorldThrustDirection.Y;
+                    t1.matrixM[1, 1] = t3.WorldThrustDirection.Y;
+                    t1.matrixM[1, 2] = -targetDirection.Y;
 
-                    PID.ComputeCoefficients(mat, ans);
-
-                    double t2c = ans[0];
-                    double t3c = ans[1];
-                    double Lambda = ans[2];
-
-
-                    // BROKEN VERSION
-                    //t1.matrixM.SetRow(0, new Vector4D(t2.WorldThrustDirection.X, t2.WorldThrustDirection.Y, t2.WorldThrustDirection.Z, 0));
-                    //t1.matrixM.SetRow(1, new Vector4D(t3.WorldThrustDirection.X, t3.WorldThrustDirection.Y, t3.WorldThrustDirection.Z, 0));
-                    //t1.matrixM.SetRow(2, new Vector4D(-targetDirection.X, -targetDirection.Y, -targetDirection.Z, 0));
-                    //t1.matrixM.SetRow(3, new Vector4D(0,0,0,1));
-
-                    //t1.equalityValues.X = (-t1.MaxThrust * t1.WorldThrustDirection.X) + g.X;
-                    //t1.equalityValues.Y = (-t1.MaxThrust * t1.WorldThrustDirection.Y) + g.Y;
-                    //t1.equalityValues.Z = (-t1.MaxThrust * t1.WorldThrustDirection.Z) + g.Z;
-
-                    //t1.matrixResult = Vector3D.TransformNormal(t1.equalityValues, Matrix.Invert(t1.matrixM));
+                    t1.matrixM[2, 0] = t2.WorldThrustDirection.Z;
+                    t1.matrixM[2, 1] = t3.WorldThrustDirection.Z;
+                    t1.matrixM[2, 2] = -targetDirection.Z;
 
 
-                    //double t2c = t1.matrixResult.X;
-                    //double t3c = t1.matrixResult.Y;
-                    //double Lambda = t1.matrixResult.Z;
+                    t1.ANS[0] = (-t1.MaxThrust * t1.WorldThrustDirection.X * maxPercentageThrustToUse) + g.X;
+                    t1.ANS[1] = (-t1.MaxThrust * t1.WorldThrustDirection.Y * maxPercentageThrustToUse) + g.Y;
+                    t1.ANS[2] = (-t1.MaxThrust * t1.WorldThrustDirection.Z * maxPercentageThrustToUse) + g.Z;
 
+                    PID.ComputeCoefficients(t1.matrixM, t1.ANS);
 
+                    t2c = t1.ANS[0];
+                    t3c = t1.ANS[1];
+                    Lambda = t1.ANS[2];
 
                     actual2Di = t2.LocalThrustDirection;
                     actual3Di = t3.LocalThrustDirection;
@@ -196,7 +145,7 @@ namespace IngameScript
                         t3c *= -1;
                     }
                     //// Publish the results
-                    t1.finalThrustForces.X = t1.MaxThrust;
+                    t1.finalThrustForces.X = t1.MaxThrust * maxPercentageThrustToUse;
                     t1.finalThrustForces.Y = t2c;
                     t1.finalThrustForces.Z = t3c;
                     t1.lambdaResult = Lambda;
@@ -207,45 +156,10 @@ namespace IngameScript
                     t1.finalThrusterGroups[3] = thrusterGroups[Base6Directions.GetOppositeDirection(t1.LocalThrustDirection)];
                     t1.finalThrusterGroups[4] = thrusterGroups[Base6Directions.GetOppositeDirection(t2.LocalThrustDirection)];
                     t1.finalThrusterGroups[5] = thrusterGroups[Base6Directions.GetOppositeDirection(t3.LocalThrustDirection)];
-
-                    #region Old comments
-
-                    // If "Forward" is chosen
-                    //if (t1.LocalThrustDirection == Base6Directions.Direction.Forward)
-                    //{
-
-
-                    //parent_program.shipIOHandler.Echo(t1.LocalThrustDirection.ToString() + ": " + (t1.MaxThrust / t1.MaxThrust).ToString());
-                    //parent_program.shipIOHandler.Echo(actual2Di.ToString() + ": " + (t2c / thrusterGroups[actual2Di].MaxThrust).ToString());
-                    //parent_program.shipIOHandler.Echo(actual3Di.ToString() + ": " + (t3c / thrusterGroups[actual3Di].MaxThrust).ToString());
-                    //parent_program.shipIOHandler.Echo("Lambda: " + Lambda.ToString());
-
-                    //if (actual2Di == Base6Directions.Direction.Down)
-                    //{
-                    //    parent_program.shipIOHandler.Echo("Down thruster name: " + thrusterGroups[actual2Di].thrusters[0].DisplayNameText);
-                    //}
-                    ////if (actualt2Di == Base6Directions.Direction.Right)
-                    ////{
-                    ////    parent_program.shipIOHandler.Echo("Right thruster name: " + thrusterGroups[actualt2Di].thrusters[0].DisplayNameText);
-                    ////}
-
-                    //if (actual3Di == Base6Directions.Direction.Down)
-                    //{
-                    //    parent_program.shipIOHandler.Echo("Down thruster name: " + thrusterGroups[actual3Di].thrusters[0].DisplayNameText);
-                    //}
-                    ////if (actualt3Di == Base6Directions.Direction.Right)
-                    ////{
-                    ////    parent_program.shipIOHandler.Echo("Right thruster name: " + thrusterGroups[actualt3Di].thrusters[0].DisplayNameText);
-                    ////}
-                    //}
-                    #endregion
-
                 }
 
                 ThrusterGroup bestCandidate = null;
                 double bestCandidateLambda = -9999999;
-
-                string ostr = "";
                 foreach (KeyValuePair<Base6Directions.Direction, ThrusterGroup> entry in thrusterGroups)
                 {
                     if (entry.Value.lambdaResult > bestCandidateLambda)
@@ -257,25 +171,10 @@ namespace IngameScript
                             bestCandidateLambda = entry.Value.lambdaResult;
                         }
                     }
-                    ostr += entry.Value.LocalThrustDirection.ToString() + " Lambda: " + entry.Value.lambdaResult.ToString() + "\n";
-                    ostr += entry.Value.finalThrusterGroups[1].LocalThrustDirection.ToString() + " C2: " + (entry.Value.finalThrustForces.Y / entry.Value.finalThrusterGroups[1].MaxThrust).ToString() + "\n";
-                    ostr += entry.Value.finalThrusterGroups[2].LocalThrustDirection.ToString() + " C3: " + (entry.Value.finalThrustForces.Z / entry.Value.finalThrusterGroups[2].MaxThrust).ToString() + "\n";
                 }
-                ErrorString = ostr;
-
                 return bestCandidate;
 
             }
-            public string ErrorString = "";
-
-
-            public void SolveThrusterSimultaneousEquations(Vector3D equalityValues, Base6Directions.Direction thrusterGroup)
-            {
-
-
-                thrusterGroups[thrusterGroup].matrixResult = Vector3D.TransformNormal(equalityValues, Matrix.Invert(thrusterGroups[thrusterGroup].matrixM));
-            }
-
 
             #region StartupCalculations
 
@@ -487,23 +386,10 @@ namespace IngameScript
                 double leftDot = 0;
                 foreach (IMyThrust thisThruster in thrusters)
                 {
-                    //if (blockIsOnMyGrid(thisThruster))
-                    //{
-
-                    //    Base6Directions.Direction thrusterLocalDirection = thisThruster.Orientation.Forward;
-
-
-
-                    //    ThrusterGroup relevantThrusterGroup = thrusterGroups[thrusterLocalDirection];
-
-
-                    //    relevantThrusterGroup.AddThruster(thisThruster);
-                    //}
                     thrusterDirection = -thisThruster.WorldMatrix.Forward;
                     forwardDot = Vector3D.Dot(thrusterDirection, cockpit.WorldMatrix.Forward);
                     upDot = Vector3D.Dot(thrusterDirection, cockpit.WorldMatrix.Up);
                     leftDot = Vector3D.Dot(thrusterDirection, cockpit.WorldMatrix.Left);
-
 
                     if (forwardDot >= 0.97)
                         thrusterGroups[Base6Directions.Direction.Forward].AddThruster(thisThruster);
@@ -517,35 +403,6 @@ namespace IngameScript
                         thrusterGroups[Base6Directions.Direction.Right].AddThruster(thisThruster);
                     else if (upDot <= -0.97)
                         thrusterGroups[Base6Directions.Direction.Down].AddThruster(thisThruster);
-
-                    #region WhatToDoIfThrusterIsNotOnSameGrid
-
-                    //else
-                    //{
-                    //    var thrusterDirection = -thisThruster.WorldMatrix.Forward;
-                    //    double forwardDot = Vector3D.Dot(thrusterDirection, Vector3D.Normalize(thrustForward));
-                    //    double leftDot = Vector3D.Dot(thrusterDirection, Vector3D.Normalize(thrustLeft));
-                    //    double upDot = Vector3D.Dot(thrusterDirection, Vector3D.Normalize(thrustUp));
-
-                    //    if (forwardDot >= 0.97)
-                    //    {
-                    //        ForceForwardThrusters.Add(thisThruster);
-                    //    }
-                    //    else if (leftDot >= 0.97)
-                    //    {
-                    //        ForceLeftThrusters.Add(thisThruster);
-                    //    }
-                    //    else if (upDot >= 0.97)
-                    //    {
-                    //        ForceUpThrusters.Add(thisThruster);
-                    //    }
-                    //    else
-                    //    {
-                    //        UnusedThrusters.Add(thisThruster);
-                    //    }
-                    //}
-
-                    #endregion
 
                 }
             }
@@ -578,109 +435,9 @@ namespace IngameScript
             #endregion
 
             // Old, do not open....
-            #region Deprecated
-            public ThrusterGroup[] FindThrusterGroupsInDirection(Vector3D _WorldDirection)
-            {
-                ThrusterGroup[] OutputGroup = new ThrusterGroup[6];
-                List<ThrusterGroup> AccumulatorGroup = new List<ThrusterGroup>();
-                List<ThrusterGroup> OtherGroup = new List<ThrusterGroup>();
-                Vector3D WorldDirection = Vector3D.Normalize(_WorldDirection);
-                foreach (KeyValuePair<Base6Directions.Direction, ThrusterGroup> entry in thrusterGroups)
-                {
-                    ThrusterGroup currentThrusterGroup = entry.Value;
-                    if (currentThrusterGroup.WorldThrustDirection.Dot(WorldDirection) > 0)
-                    {
-                        AccumulatorGroup.Add(currentThrusterGroup);
-                    }
-                    else
-                    {
-                        OtherGroup.Add(currentThrusterGroup);
-                    }
-                }
-                if (AccumulatorGroup.Count > 3)
-                {
-                    AccumulatorGroup.Sort(delegate (ThrusterGroup c1, ThrusterGroup c2) {
-                        if (c1.WorldThrustDirection.Dot(WorldDirection) > c2.WorldThrustDirection.Dot(WorldDirection))
-                        {
-                            return -1;
-                        }
-                        else
-                        {
-                            return 1;
-                        }
-                    });
-                    for (int i = 3; i < AccumulatorGroup.Count; i++)
-                    {
-                        OtherGroup.Add(AccumulatorGroup[i]);
-                    }
-                    parent_program.shipIOHandler.Echo("Warning, more than 3 viable thruster groups found! removing extra ones");
-                }
-                if (AccumulatorGroup.Count < 3)
-                {
-                    parent_program.shipIOHandler.Error("Only two viable thruster groups found!\nPlease rotate the ship slightly and recompile, that could fix this.");
-                }
-                OutputGroup[0] = AccumulatorGroup[0];
-                OutputGroup[1] = AccumulatorGroup[1];
-                OutputGroup[2] = AccumulatorGroup[2];
-                // BELOW ARE UNUSED GROUPS!
-                OutputGroup[3] = OtherGroup[0];
-                OutputGroup[4] = OtherGroup[1];
-                OutputGroup[5] = OtherGroup[2];
+            #region Debug
 
-                return OutputGroup;
-            }
-
-
-            /// <summary>
-            /// Finds the thrust (Newtons) available in the ship after gravity is accounted for. <br />
-            /// The leftover thrusts must be up to-date: PopulateThrusterGroupsLeftoverThrust()
-            /// </summary>
-            /// <param name="thrust_direction"></param>
-            /// <returns></returns>
-            public double FindMaxAvailableThrustInDirection(Vector3D thrust_direction)
-            {
-                ThrusterGroup[] relevantThrusterGroups = FindThrusterGroupsInDirection(thrust_direction);
-                double a = relevantThrusterGroups[0].LeftoverThrust;
-                double b = relevantThrusterGroups[1].LeftoverThrust;
-                double c = relevantThrusterGroups[2].LeftoverThrust;
-
-                double a1 = thrust_direction.X;
-                double a2 = thrust_direction.Y;
-                double a3 = thrust_direction.Z;
-
-                double Alpha = a1 / a;
-                double Beta = a2 / b;
-                double Gamma = a3 / c;
-
-                double max = Math.Max(Math.Max(Alpha, Beta), Gamma);
-                double t = 1 / max;
-                return (t * Vector3D.Normalize(thrust_direction)).Length();
-            }
-
-            public void PopulateThrusterGroupsLeftoverThrust(Vector3D Gravity_And_Unknown_Force)
-            {
-
-
-                ThrusterGroup[] gravityThrusterGroupsToUse = FindThrusterGroupsInDirection(Gravity_And_Unknown_Force);
-
-                double[] thrustsNeededForGravityAndUnknown = CalculateThrusterGroupsPower(Gravity_And_Unknown_Force, gravityThrusterGroupsToUse);
-
-                gravityThrusterGroupsToUse[0].LeftoverThrust = gravityThrusterGroupsToUse[0].MaxThrust - thrustsNeededForGravityAndUnknown[0];
-                gravityThrusterGroupsToUse[1].LeftoverThrust = gravityThrusterGroupsToUse[1].MaxThrust - thrustsNeededForGravityAndUnknown[1];
-                gravityThrusterGroupsToUse[2].LeftoverThrust = gravityThrusterGroupsToUse[2].MaxThrust - thrustsNeededForGravityAndUnknown[2];
-
-                gravityThrusterGroupsToUse[3].LeftoverThrust = gravityThrusterGroupsToUse[3].MaxThrust;
-                gravityThrusterGroupsToUse[4].LeftoverThrust = gravityThrusterGroupsToUse[4].MaxThrust;
-                gravityThrusterGroupsToUse[5].LeftoverThrust = gravityThrusterGroupsToUse[5].MaxThrust;
-            }
-
-            public double FindAmountOfForceInDirection(Vector3D TotalForce, Vector3D componentDirection)
-            {
-                double componentDirectionLength = componentDirection.Length();
-                Vector3D projectedVector = (TotalForce.Dot(componentDirection) / componentDirectionLength) * (componentDirection / componentDirection.Length());
-                return projectedVector.Length();
-            }
-            public Vector3D FindActualForceFromThrusters(ThrusterGroup thrusterGroupToUse)
+            public void CheckForceFromThrusters(ThrusterGroup thrusterGroupToUse, Vector3D targetVector, Vector3D gravity_and_unknown)
             {
                 Vector3D totalThrusterForce = Vector3D.Zero;
                 
@@ -689,145 +446,22 @@ namespace IngameScript
                 totalThrusterForce += Vector3D.Normalize(thrusterGroupToUse.finalThrusterGroups[2].WorldThrustDirection) * thrusterGroupToUse.finalThrustForces.Z;
                 if (thrusterGroupToUse.finalThrustForces.X > thrusterGroupToUse.finalThrusterGroups[0].MaxThrust)
                 {
-                    Echo(thrusterGroupToUse.finalThrusterGroups[0].LocalThrustDirection.ToString() + "over: " + IOHandler.RoundToSignificantDigits(thrusterGroupToUse.finalThrustForces.X / thrusterGroupToUse.finalThrusterGroups[0].MaxThrust, 3).ToString());
+                    Echo(thrusterGroupToUse.finalThrusterGroups[0].LocalThrustDirection.ToString() + " has not enough force: " + IOHandler.RoundToSignificantDigits(thrusterGroupToUse.finalThrustForces.X / thrusterGroupToUse.finalThrusterGroups[0].MaxThrust, 3).ToString());
                 }
                 if (thrusterGroupToUse.finalThrustForces.Y > thrusterGroupToUse.finalThrusterGroups[1].MaxThrust)
                 {
-                    Echo(thrusterGroupToUse.finalThrusterGroups[1].LocalThrustDirection.ToString() + "over: " + IOHandler.RoundToSignificantDigits(thrusterGroupToUse.finalThrustForces.Y / thrusterGroupToUse.finalThrusterGroups[1].MaxThrust, 3).ToString());
+                    Echo(thrusterGroupToUse.finalThrusterGroups[1].LocalThrustDirection.ToString() + " has not enough force: " + IOHandler.RoundToSignificantDigits(thrusterGroupToUse.finalThrustForces.Y / thrusterGroupToUse.finalThrusterGroups[1].MaxThrust, 3).ToString());
                 }
                 if (thrusterGroupToUse.finalThrustForces.Z > thrusterGroupToUse.finalThrusterGroups[2].MaxThrust)
                 {
-                    Echo(thrusterGroupToUse.finalThrusterGroups[2].LocalThrustDirection.ToString() + "over: " + IOHandler.RoundToSignificantDigits(thrusterGroupToUse.finalThrustForces.Z / thrusterGroupToUse.finalThrusterGroups[2].MaxThrust, 3).ToString());
+                    Echo(thrusterGroupToUse.finalThrusterGroups[2].LocalThrustDirection.ToString() + " has not enough force: " + IOHandler.RoundToSignificantDigits(thrusterGroupToUse.finalThrustForces.Z / thrusterGroupToUse.finalThrusterGroups[2].MaxThrust, 3).ToString());
                 }
 
-
-                return totalThrusterForce;
-            }
-
-            public struct ThrusterForceAnalysis
-            {
-                ShipSystemsAnalyzer systems_parent;
-
-                public List<IMyThrust> ForceForwardThrusters; // Forward with respect to the direction the thrusters will be firing
-                public List<IMyThrust> ForceLeftThrusters;
-                public List<IMyThrust> ForceUpThrusters;
-                public List<IMyThrust> UnusedThrusters;
-                // Accumulated max thrust numbers
-                public double ForwardMaxThrust;
-                public double LeftMaxThrust;
-                public double UpMaxThrust;
-
-                /// <summary>
-                /// This is the raw value (not including gravity and such) that the thrusters can possibly push the ship in the given direction.
-                /// </summary>
-                //public double maxAvailableThrustInDirection; 
-                // Thrust directions
-                public Vector3D thrustForward;
-                public Vector3D thrustLeft;
-                public Vector3D thrustUp;
-
-                public IMyTerminalBlock blockWithRespectTo;
-                public Vector3D analysisDirection;
-
-
-
-                public ThrusterForceAnalysis(Vector3D directionToAnalyze, IMyTerminalBlock _blockWithRespectTo, ShipSystemsAnalyzer _systems_parent)
+                Vector3D resultantNoGravT = totalThrusterForce + gravity_and_unknown;
+                double dot_ratingT = Vector3D.Dot(Vector3D.Normalize(targetVector), Vector3D.Normalize(resultantNoGravT));
+                if(dot_ratingT < 0.98 && dot_ratingT > -0.98)
                 {
-                    blockWithRespectTo = _blockWithRespectTo;
-                    systems_parent = _systems_parent;
-                    analysisDirection = directionToAnalyze;
-
-
-                    ForceForwardThrusters = new List<IMyThrust>();
-                    ForceLeftThrusters = new List<IMyThrust>();
-                    ForceUpThrusters = new List<IMyThrust>();
-                    UnusedThrusters = new List<IMyThrust>();
-
-                    ForwardMaxThrust = 0;
-                    LeftMaxThrust = 0;
-                    UpMaxThrust = 0;
-
-                    var referenceOrigin = blockWithRespectTo.GetPosition();
-
-                    var block_WorldMatrix = VRageMath.Matrix.CreateWorld(referenceOrigin,
-                        blockWithRespectTo.WorldMatrix.Up, //referenceBlock.WorldMatrix.Forward,
-                        -blockWithRespectTo.WorldMatrix.Forward //referenceBlock.WorldMatrix.Up
-                    );
-
-                    thrustForward = block_WorldMatrix.Forward;
-                    thrustLeft = block_WorldMatrix.Left;
-                    thrustUp = block_WorldMatrix.Up;
-
-                    if (thrustForward.Dot(analysisDirection) < 0)
-                    {
-                        thrustForward *= -1;
-                    }
-                    if (thrustLeft.Dot(analysisDirection) < 0)
-                    {
-                        thrustLeft *= -1;
-                    }
-                    if (thrustUp.Dot(analysisDirection) < 0)
-                    {
-                        thrustUp *= -1;
-                    }
-
-                    foreach (IMyThrust thisThruster in systems_parent.thrusters)
-                    {
-                        var thrusterDirection = -thisThruster.WorldMatrix.Forward;
-                        double forwardDot = Vector3D.Dot(thrusterDirection, Vector3D.Normalize(thrustForward));
-                        double leftDot = Vector3D.Dot(thrusterDirection, Vector3D.Normalize(thrustLeft));
-                        double upDot = Vector3D.Dot(thrusterDirection, Vector3D.Normalize(thrustUp));
-
-                        if (forwardDot >= 0.97)
-                        {
-                            ForceForwardThrusters.Add(thisThruster);
-                        }
-                        else if (leftDot >= 0.97)
-                        {
-                            ForceLeftThrusters.Add(thisThruster);
-                        }
-                        else if (upDot >= 0.97)
-                        {
-                            ForceUpThrusters.Add(thisThruster);
-                        }
-                        else
-                        {
-                            UnusedThrusters.Add(thisThruster);
-                        }
-                    }
-
-                    foreach (IMyThrust thisThruster in ForceForwardThrusters)
-                    {
-                        ForwardMaxThrust += thisThruster.MaxEffectiveThrust;
-                    }
-                    foreach (IMyThrust thisThruster in ForceLeftThrusters)
-                    {
-                        LeftMaxThrust += thisThruster.MaxEffectiveThrust;
-                    }
-                    foreach (IMyThrust thisThruster in ForceUpThrusters)
-                    {
-                        UpMaxThrust += thisThruster.MaxEffectiveThrust;
-                    }
-
-                }
-
-                public double FindMaxAvailableThrustInDirection(double f_max_thrust, double u_max_thrust, double l_max_thrust, Vector3D thrust_direction)
-                {
-                    double a = f_max_thrust;
-                    double b = u_max_thrust;
-                    double c = l_max_thrust;
-
-                    double a1 = thrust_direction.X;
-                    double a2 = thrust_direction.Y;
-                    double a3 = thrust_direction.Z;
-
-                    double Alpha = a1 / a;
-                    double Beta = a2 / b;
-                    double Gamma = a3 / c;
-
-                    double max = Math.Max(Math.Max(Alpha, Beta), Gamma);
-                    double t = 1 / max;
-                    return (t * Vector3D.Normalize(thrust_direction)).Length();
+                    Echo("WARNING, direction dot is: " + dot_ratingT.ToString());
                 }
             }
 
@@ -843,21 +477,18 @@ namespace IngameScript
             public Base6Directions.Direction LocalThrustDirection;
             public List<IMyThrust> thrusters;
             public Vector3D WorldThrustDirection;
+            public int directionSign = 1;
 
             // Temporary variables, defined here so they aren't defined every frame.
-            public Vector3D matrixResult;
             public double lambdaResult = 0;
-            public Matrix matrixM;
-            public Vector3D equalityValues;
+            public double[,] matrixM;
+            public double[] ANS;
             public Vector3D finalThrustForces;
             public ThrusterGroup[] finalThrusterGroups;
 
-            public int directionSign = 1;
 
             /// <summary>Force In Newtons</summary>
             public double MaxThrust;
-            /// <summary>Thrust leftover, after gravity + unknown forces are accounted for</summary>
-            public double LeftoverThrust = 0;
             
             public ThrusterGroup(Program _parent_program, Base6Directions.Direction direction, IMyTerminalBlock _directionReferenceBlock)
             {
@@ -867,12 +498,11 @@ namespace IngameScript
                 MaxThrust = 0;
                 LocalThrustDirection = direction;
                 UpdateWorldDirection();
-                matrixResult = new Vector3D();
-                equalityValues = new Vector3D();
+                ANS = new double[3];
                 finalThrustForces = new Vector3D();
                 finalThrusterGroups = new ThrusterGroup[6];
-                matrixM = new Matrix();
-                matrixM = Matrix.Identity;
+                matrixM = new double[3,3];
+
                 if (LocalThrustDirection == Base6Directions.Direction.Down ||
                     LocalThrustDirection == Base6Directions.Direction.Right ||
                     LocalThrustDirection == Base6Directions.Direction.Backward)
@@ -898,8 +528,5 @@ namespace IngameScript
             }
 
         }
-    
-        
-
     }
 }
