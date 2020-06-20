@@ -275,7 +275,7 @@ namespace IngameScript
 
 
 
-            bool use_new_method = false;
+            bool use_new_method = true;
 
 
 
@@ -295,13 +295,18 @@ namespace IngameScript
                 use_new_method = false;
             }
 
-            //shipIOHandler.Echo(Vector3D.Normalize(Gravity_And_Unknown_Forces));
 
+            //shipIOHandler.Echo(systemsAnalyzer.ErrorString);
 
-
-
-
-
+            //foreach (IMyThrust thrust in systemsAnalyzer.thrusterGroups[Base6Directions.Direction.Forward].thrusters)
+            //{
+            //    shipIOHandler.Echo(thrust.CustomName);
+            //}
+            shipIOHandler.Echo("Up: " + systemsAnalyzer.thrusterGroups[Base6Directions.Direction.Up].thrusters[0].CustomName);
+            shipIOHandler.Echo("Down: " + systemsAnalyzer.thrusterGroups[Base6Directions.Direction.Down].thrusters[0].CustomName);
+            shipIOHandler.Echo("Left: " + systemsAnalyzer.thrusterGroups[Base6Directions.Direction.Left].thrusters[0].CustomName);
+            shipIOHandler.Echo("Forward: " + systemsAnalyzer.thrusterGroups[Base6Directions.Direction.Forward].thrusters[0].CustomName);
+            shipIOHandler.Echo("Backward: " + systemsAnalyzer.thrusterGroups[Base6Directions.Direction.Backward].thrusters[0].CustomName);
 
 
             if (use_new_method)
@@ -319,8 +324,8 @@ namespace IngameScript
             else
             {
                 // Using old deprecated method just so that the thrusters can stay afloat:
-                ThrusterGroup[] thrusterGroupsToUse = systemsAnalyzer.FindThrusterGroupsInDirection(Gravity_And_Unknown_Forces);
-                double[] thrustsNeededOverall = systemsAnalyzer.CalculateThrusterGroupsPower(Gravity_And_Unknown_Forces, thrusterGroupsToUse);
+                ThrusterGroup[] thrusterGroupsToUse = systemsAnalyzer.FindThrusterGroupsInDirection(-Gravity_And_Unknown_Forces);
+                double[] thrustsNeededOverall = systemsAnalyzer.CalculateThrusterGroupsPower(-Gravity_And_Unknown_Forces, thrusterGroupsToUse);
 
                 //shipIOHandler.Echo("1: " + (thrustsNeededOverall.X / thrusterGroupsToUse[0].MaxThrust).ToString());
                 //shipIOHandler.Echo("2: " + (thrustsNeededOverall.Y / thrusterGroupsToUse[1].MaxThrust).ToString());
