@@ -17,6 +17,7 @@ using VRage.Game;
 using VRage;
 using VRageMath;
 using VRage.Noise.Modifiers;
+using System.Security.Permissions;
 
 namespace IngameScript
 {
@@ -51,7 +52,6 @@ namespace IngameScript
             public ThrusterGroup RightThrust;
             public Dictionary<Base6Directions.Direction,ThrusterGroup> thrusterGroups;
 
-            // temporary calculation variables:
 
             public ShipSystemsAnalyzer(Program in_parent_program)
             {
@@ -60,14 +60,21 @@ namespace IngameScript
                 GatherBasicData();
             }
 
-
-            public ThrusterGroup SolveMaxThrust(Vector3D g, Vector3D targetDirection, double maxPercentageThrustToUse = 1)
+            /// <summary>
+            /// Solves the required thrusts to go in targetDirection at max speed. This takes gravity into account.
+            /// </summary>
+            /// <param name="g">Gravity and unknown forces</param>
+            /// <param name="targetDirection">The target direction to go in</param>
+            /// <param name="maxPercentageThrustToUse">The maximum amount of thrust devoted to going in the target direction.</param>
+            /// <returns></returns>
+            public ThrusterGroup SolveMaxThrust(Vector3D minus_g, Vector3D targetDirection, double maxPercentageThrustToUse = 1)
             {
+
                 Base6Directions.Direction actual2Di;
                 Base6Directions.Direction actual3Di;
-                double t2c = 0;
-                double t3c = 0;
-                double Lambda = 0;
+                double t2c;
+                double t3c;
+                double Lambda;
                 ThrusterGroup t1;
                 ThrusterGroup t2;
                 ThrusterGroup t3;
@@ -122,9 +129,9 @@ namespace IngameScript
                     t1.matrixM[2, 2] = -targetDirection.Z;
 
 
-                    t1.ANS[0] = (-t1.MaxThrust * t1.WorldThrustDirection.X * maxPercentageThrustToUse) + g.X;
-                    t1.ANS[1] = (-t1.MaxThrust * t1.WorldThrustDirection.Y * maxPercentageThrustToUse) + g.Y;
-                    t1.ANS[2] = (-t1.MaxThrust * t1.WorldThrustDirection.Z * maxPercentageThrustToUse) + g.Z;
+                    t1.ANS[0] = (-t1.MaxThrust * t1.WorldThrustDirection.X * maxPercentageThrustToUse) - minus_g.X;
+                    t1.ANS[1] = (-t1.MaxThrust * t1.WorldThrustDirection.Y * maxPercentageThrustToUse) - minus_g.Y;
+                    t1.ANS[2] = (-t1.MaxThrust * t1.WorldThrustDirection.Z * maxPercentageThrustToUse) - minus_g.Z;
 
                     PID.ComputeCoefficients(t1.matrixM, t1.ANS);
 
@@ -175,6 +182,12 @@ namespace IngameScript
                 return bestCandidate;
 
             }
+
+            public ThrusterGroup SolvePartialThrust(Vector3D minus_g, Vector3D targetThrust)
+            {
+
+            }
+
 
             #region StartupCalculations
 
@@ -434,7 +447,6 @@ namespace IngameScript
             }
             #endregion
 
-            // Old, do not open....
             #region Debug
 
             public void CheckForceFromThrusters(ThrusterGroup thrusterGroupToUse, Vector3D targetVector, Vector3D gravity_and_unknown)
@@ -527,6 +539,30 @@ namespace IngameScript
                 WorldThrustDirection = directionReferenceBlock.WorldMatrix.GetDirectionVector(LocalThrustDirection);
             }
 
+        }
+
+        public class ThrusterGroupResult
+        {
+            public Vector3D finalThrustForces;
+            public ThrusterGroup[] finalThrusterGroups;
+            public double lambdaResult;
+
+            public ThrusterGroupResult(ThrusterGroup group_to_copy)
+            {
+                finalThrustForces.X = group_to_copy.finalThrustForces.X;
+                finalThrustForces.Y = group_to_copy.finalThrustForces.Y;
+                finalThrustForces.Z = group_to_copy.finalThrustForces.Z;
+
+                finalThrusterGroups = new ThrusterGroup[6];
+                finalThrusterGroups[0] = group_to_copy.finalThrusterGroups[0];
+                finalThrusterGroups[1] = group_to_copy.finalThrusterGroups[1];
+                finalThrusterGroups[2] = group_to_copy.finalThrusterGroups[2];
+                finalThrusterGroups[3] = group_to_copy.finalThrusterGroups[3];
+                finalThrusterGroups[4] = group_to_copy.finalThrusterGroups[4];
+                finalThrusterGroups[5] = group_to_copy.finalThrusterGroups[5];
+                finalThrusterGroups[6] = group_to_copy.finalThrusterGroups[6];
+                lambdaResult = group_to_copy.lambdaResult;
+            }
         }
     }
 }
