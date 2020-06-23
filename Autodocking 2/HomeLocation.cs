@@ -47,12 +47,13 @@ namespace IngameScript
             public HomeLocation(string new_arg, IMyShipConnector my_connector, IMyShipConnector station_connector)
             {
                 arguments.Add(new_arg);
-                my_connector_ID = my_connector.EntityId;
-                station_connector_ID = station_connector.EntityId;
-                station_connector_position = station_connector.GetPosition();
-                station_connector_forward = station_connector.WorldMatrix.Up;
-                station_connector_up = -station_connector.WorldMatrix.Forward;
-                station_connector_name = station_connector.CustomName;
+                UpdateData(my_connector, station_connector);
+                //my_connector_ID = my_connector.EntityId;
+                //station_connector_ID = station_connector.EntityId;
+                //station_connector_position = station_connector.GetPosition();
+                //station_connector_forward = station_connector.WorldMatrix.Up;
+                //station_connector_up = -station_connector.WorldMatrix.Forward;
+                //station_connector_name = station_connector.CustomName;
             }
             /// <summary>
             /// Serializes the HomeLocation into a string ready to be saved.
