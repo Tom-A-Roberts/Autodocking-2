@@ -183,10 +183,92 @@ namespace IngameScript
 
             }
 
-            public ThrusterGroup SolvePartialThrust(Vector3D minus_g, Vector3D targetThrust)
+            public ThrusterGroup SolvePartialThrust(Vector3D g, Vector3D targetThrust)
             {
+                Vector3D resultantForce = -g + targetThrust;
+                ThrusterGroup t1 = FindThrusterGroupsInDirection(resultantForce);
+                //var mat = new double[,] {
+                //    { t1.finalThrusterGroups[0].WorldThrustDirection.X, t1.finalThrusterGroups[1].WorldThrustDirection.X, t1.finalThrusterGroups[2].WorldThrustDirection.X },
+                //    { t1.finalThrusterGroups[0].WorldThrustDirection.Y, t1.finalThrusterGroups[1].WorldThrustDirection.Y, t1.finalThrusterGroups[2].WorldThrustDirection.Y },
+                //    { t1.finalThrusterGroups[0].WorldThrustDirection.Z, t1.finalThrusterGroups[1].WorldThrustDirection.Z, t1.finalThrusterGroups[2].WorldThrustDirection.Z },
+                //};
+                t1.matrixM[0, 0] = t1.finalThrusterGroups[0].WorldThrustDirection.X;
+                t1.matrixM[0, 1] = t1.finalThrusterGroups[1].WorldThrustDirection.X;
+                t1.matrixM[0, 2] = t1.finalThrusterGroups[2].WorldThrustDirection.X;
 
+                t1.matrixM[1, 0] = t1.finalThrusterGroups[0].WorldThrustDirection.Y;
+                t1.matrixM[1, 1] = t1.finalThrusterGroups[1].WorldThrustDirection.Y;
+                t1.matrixM[1, 2] = t1.finalThrusterGroups[2].WorldThrustDirection.Y;
+
+                t1.matrixM[2, 0] = t1.finalThrusterGroups[0].WorldThrustDirection.Z;
+                t1.matrixM[2, 1] = t1.finalThrusterGroups[1].WorldThrustDirection.Z;
+                t1.matrixM[2, 2] = t1.finalThrusterGroups[2].WorldThrustDirection.Z;
+
+
+                t1.ANS[0] = resultantForce.X;
+                t1.ANS[1] = resultantForce.Y;
+                t1.ANS[2] = resultantForce.Z;
+
+                //t1.ANS WorldDirectionForce.X, WorldDirectionForce.Y, WorldDirectionForce.Z };
+                PID.ComputeCoefficients(t1.matrixM, t1.ANS);
+                t1.finalThrustForces.X = t1.ANS[0];
+                t1.finalThrustForces.Y = t1.ANS[1];
+                t1.finalThrustForces.Z = t1.ANS[2];
+
+                return t1;
             }
+
+            public ThrusterGroup FindThrusterGroupsInDirection(Vector3D _WorldDirection)
+            {
+                List<ThrusterGroup> AccumulatorGroup = new List<ThrusterGroup>();
+                List<ThrusterGroup> OtherGroup = new List<ThrusterGroup>();
+                Vector3D WorldDirection = Vector3D.Normalize(_WorldDirection);
+                foreach (KeyValuePair<Base6Directions.Direction, ThrusterGroup> entry in thrusterGroups)
+                {
+                    ThrusterGroup currentThrusterGroup = entry.Value;
+                    if (currentThrusterGroup.WorldThrustDirection.Dot(WorldDirection) > 0)
+                    {
+                        AccumulatorGroup.Add(currentThrusterGroup);
+                    }
+                    else
+                    {
+                        OtherGroup.Add(currentThrusterGroup);
+                    }
+                }
+                if (AccumulatorGroup.Count > 3)
+                {
+                    AccumulatorGroup.Sort(delegate (ThrusterGroup c1, ThrusterGroup c2) {
+                        if (c1.WorldThrustDirection.Dot(WorldDirection) > c2.WorldThrustDirection.Dot(WorldDirection))
+                        {
+                            return -1;
+                        }
+                        else
+                        {
+                            return 1;
+                        }
+                    });
+                    for (int i = 3; i < AccumulatorGroup.Count; i++)
+                    {
+                        OtherGroup.Add(AccumulatorGroup[i]);
+                    }
+                    parent_program.shipIOHandler.Echo("Warning, more than 3 viable thruster groups found! removing extra ones");
+                }
+                if (AccumulatorGroup.Count < 3)
+                {
+                    parent_program.shipIOHandler.Error("Only two viable thruster groups found!\nPlease rotate the ship slightly and recompile, that could fix this.");
+                }
+                ThrusterGroup t1 = AccumulatorGroup[0];
+                t1.finalThrusterGroups[0] = AccumulatorGroup[0];
+                t1.finalThrusterGroups[1] = AccumulatorGroup[1];
+                t1.finalThrusterGroups[2] = AccumulatorGroup[2];
+                // BELOW ARE UNUSED GROUPS!
+                t1.finalThrusterGroups[3] = OtherGroup[0];
+                t1.finalThrusterGroups[4] = OtherGroup[1];
+                t1.finalThrusterGroups[5] = OtherGroup[2];
+
+                return t1;
+            }
+
 
 
             #region StartupCalculations

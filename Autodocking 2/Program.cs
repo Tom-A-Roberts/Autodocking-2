@@ -1,4 +1,5 @@
-﻿using Sandbox.ModAPI.Ingame;
+﻿using EmptyKeys.UserInterface.Generated.DataTemplatesContracts_Bindings;
+using Sandbox.ModAPI.Ingame;
 using Sandbox.ModAPI.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -14,8 +15,8 @@ namespace IngameScript
         // CHANGEABLE VARIABLES:
 
         const double updatesPerSecond = 10;             // Defines how many times the script performes it's calculations per second.
-        const double topSpeed = 15;                     // The top speed the ship will go, m/s.
-
+        const double topSpeed = 100;                    // The top speed the ship will go, m/s.
+        const double caution = 0.4;                     // Between 0 - 0.9. Defines how close to max deceleration the ship will ride.
 
         // DO NOT CHANGE BELOW THIS LINE \/ \/ \/
 
@@ -255,72 +256,76 @@ namespace IngameScript
         }
 
 
-        /// <summary>Equivalent to "Update()" from Unity but specifically for the docking sequence.</summary>
+
         void DockingSequenceFrameUpdate()
         {
-            systemsAnalyzer.UpdateThrusterGroupsWorldDirections();
             //AlignWithGravity();
+            Vector3D waypoint1 = new Vector3D(13310.29, 143907.58, -108825.71);
+            double accuracy = MoveToWaypoint(waypoint1);
+
+
+            shipIOHandler.EchoFinish(false, 1.6f);
+        }
+
+        /// <summary>Equivalent to "Update()" from Unity but specifically for the docking sequence.</summary>
+        double MoveToWaypoint(Vector3D WaypointPosition)
+        {
+
+            const double accuracy_allowance = 0.1;
+
+            systemsAnalyzer.UpdateThrusterGroupsWorldDirections();
+            
             var CurrentVelocity = systemsAnalyzer.cockpit.GetShipVelocities().LinearVelocity;
 
-
-            //Direction is up and slightly backwards
-            //SetResultantAcceleration(Vector3D.Normalize(new Vector3D(-1,1,-0.5)));
+            ThrusterGroup forceThrusterGroup;
+            string status = "ERROR";
 
             var UnknownAcceleration = Vector3.Zero;
             var Gravity_And_Unknown_Forces = (systemsAnalyzer.cockpit.GetTotalGravity() + UnknownAcceleration) * systemsAnalyzer.shipMass;
 
-            Vector3D TargetPosition = new Vector3D(53568.16, -26658.89, 12056.86);
-            Vector3D TargetRoute = TargetPosition - systemsAnalyzer.cockpit.GetPosition();
+            Vector3D TargetRoute = WaypointPosition - systemsAnalyzer.cockpit.GetPosition();
             Vector3D TargetDirection = Vector3D.Normalize(TargetRoute);
+            double totalDistanceLeft = TargetRoute.Length();
 
 
             // Finding max forward thrust:
-            //Vector3D TargetVelocity = (TargetDirection * topSpeed) + platformVelocity;
-            //Vector3D velocityDifference = CurrentVelocity - TargetVelocity;
-            Vector3D TargetVelocity = (TargetDirection * topSpeed) + platformVelocity;
+            double LeadVelocity = (CurrentVelocity - platformVelocity).Length() + 1;
+            if (LeadVelocity > topSpeed)
+            {
+                LeadVelocity = topSpeed;
+            }
+            Vector3D TargetVelocity = (TargetDirection * LeadVelocity) + platformVelocity;
             Vector3D velocityDifference = CurrentVelocity - TargetVelocity;
-            Vector3D forward_thrust_direction = Vector3D.Normalize(TargetRoute);
-            forward_thrust_direction = -Vector3D.Normalize(velocityDifference);
-            ThrusterGroup forceThrusterGroup = systemsAnalyzer.SolveMaxThrust(Gravity_And_Unknown_Forces, forward_thrust_direction, 1);
-            double max_forward_acceleration = forceThrusterGroup.lambdaResult / systemsAnalyzer.shipMass;
-            Vector3D forwardAcceleration = max_forward_acceleration * forward_thrust_direction;
+            double max_forward_acceleration;
+            if (velocityDifference.Length() == 0)
+            {
+                max_forward_acceleration = 0;
+            }
+            else
+            {
+                Vector3D forward_thrust_direction = Vector3D.Normalize(TargetRoute);
+                forward_thrust_direction = -Vector3D.Normalize(velocityDifference);
+                forceThrusterGroup = systemsAnalyzer.SolveMaxThrust(Gravity_And_Unknown_Forces, forward_thrust_direction, 1);
+                max_forward_acceleration = forceThrusterGroup.lambdaResult / systemsAnalyzer.shipMass;
+            }
 
             // Finding reverse thrust:
-            //Vector3D reverse_target_thrust_direction = -Vector3D.Normalize(CurrentVelocity - platformVelocity);
-            Vector3D reverse_thrust_direction = -Vector3D.Normalize(TargetRoute);//-Vector3D.Normalize(TargetVelocity - platformVelocity);
-            forceThrusterGroup = systemsAnalyzer.SolveMaxThrust(Gravity_And_Unknown_Forces, reverse_thrust_direction, 1);
-            double max_reverse_acceleration = forceThrusterGroup.lambdaResult / systemsAnalyzer.shipMass;
-            Vector3D reverseAcceleration = max_reverse_acceleration * reverse_thrust_direction;
-
+            Vector3D reverse_target_velocity = platformVelocity;
+            Vector3D reverse_velocity_difference = CurrentVelocity - reverse_target_velocity;
+            double max_reverse_acceleration;
+            if (reverse_velocity_difference.Length() == 0)
+            {
+                max_reverse_acceleration = 0;
+            }
+            else
+            {
+                Vector3D reverse_thrust_direction = -Vector3D.Normalize(TargetRoute);
+                //reverse_thrust_direction = -Vector3D.Normalize(reverse_velocity_difference);
+                forceThrusterGroup = systemsAnalyzer.SolveMaxThrust(Gravity_And_Unknown_Forces, reverse_thrust_direction, 1);
+                max_reverse_acceleration = (forceThrusterGroup.lambdaResult) / systemsAnalyzer.shipMass;
+            }
 
             // Finding predictive point:
-            //double targetSpeed = velocityDifference.Length();
-            double distanceToTarget = TargetRoute.Length();
-
-            // In the case of a trapezium graph:
-            double timeToGetToTopSpeed;
-            double distanceToGetToTopSpeed;
-
-            double timeToGetToZero;
-            double distanceToGetToZero;
-
-            double timeDrifting;
-
-            
-            double topSpeedAchievable;
-
-            const double ERROR_ALLOWANCE = 0.5;
-
-            // WARNING! 0 error!
-            if (max_forward_acceleration <= 0.001 && max_forward_acceleration >= 0.001)
-            {
-                max_forward_acceleration = 0.001;
-            }
-            if (max_reverse_acceleration <= 0.001 && max_reverse_acceleration >= 0.001)
-            {
-                max_reverse_acceleration = 0.001;
-            }
-
             #region attempt 1
 
 
@@ -377,40 +382,66 @@ namespace IngameScript
             //error_amount = Vector3D.Zero;
             #endregion
 
-            double DeltaTime =  Runtime.TimeSinceLastRun.TotalSeconds;
-            //shipIOHandler.Echo("Delta time: " + DeltaTime.TotalSeconds.ToString());
-            #region Status Calculations
-            distanceToGetToTopSpeed = 0;
-            string status = "ERROR";
-            double thrustPower = 1;
-            if (distanceToGetToTopSpeed == 0)
+            double DeltaTime =  Runtime.TimeSinceLastRun.TotalSeconds * 10;
+
+            double timeToGetToZero = 0;
+            double distanceToGetToZero = 0;
+            
+
+            bool Accelerating = false;
+
+
+            if (max_reverse_acceleration != 0)
             {
-                status = "Drifting";
-                thrustPower = 0;
+                timeToGetToZero = reverse_velocity_difference.Length() / (max_reverse_acceleration * (1 - caution));
+                timeToGetToZero += DeltaTime;
+                distanceToGetToZero = (reverse_velocity_difference.Length() * timeToGetToZero) / 2;
+            }
+            if (distanceToGetToZero + accuracy_allowance < totalDistanceLeft)
+            {
+                Accelerating = true;
+            }
+
+
+            if (Accelerating)
+            {
+                //// Finding the partial/max thrust to perform
+                Vector3D target_acceleration = -velocityDifference / DeltaTime;
+                Vector3D target_thrust = target_acceleration * systemsAnalyzer.shipMass;
+                double target_acceleration_amount = target_acceleration.Length();
+                if (target_acceleration_amount > max_forward_acceleration)
+                {
+                    forceThrusterGroup = systemsAnalyzer.SolveMaxThrust(Gravity_And_Unknown_Forces, Vector3.Normalize(target_acceleration), 1);
+                    // Cannot be done in 1 frame so we just do max thrust
+                    status = "Speeding up";
+                }
+                else
+                {
+                    forceThrusterGroup = systemsAnalyzer.SolvePartialThrust(Gravity_And_Unknown_Forces, target_thrust);
+                    // Can be done within 1 frame
+                    status = "Drifting";
+                }
             }
             else
             {
-                status = "Speeding up";
-                thrustPower = 1;
+                Vector3D target_acceleration = -reverse_velocity_difference / DeltaTime;
+                Vector3D target_thrust = target_acceleration * systemsAnalyzer.shipMass;
+                double target_acceleration_amount = target_acceleration.Length();
+                if (target_acceleration_amount > max_reverse_acceleration)
+                {
+                    forceThrusterGroup = systemsAnalyzer.SolveMaxThrust(Gravity_And_Unknown_Forces, Vector3.Normalize(target_acceleration), 1);
+                    // Cannot be done in 1 frame so we just do max thrust
+                    status = "Slowing down";
+                }
+                else
+                {
+                    forceThrusterGroup = systemsAnalyzer.SolvePartialThrust(Gravity_And_Unknown_Forces, target_thrust);
+                    // Can be done within 1 frame
+                    status = "Finished";
+                }
             }
+
             shipIOHandler.Echo("Status: " + status);
-            #endregion
-
-            //// Finding the partial/max thrust to perform
-            Vector3D target_acceleration = -velocityDifference / DeltaTime;
-            Vector3D target_thrust = target_acceleration * systemsAnalyzer.shipMass;
-            double target_acceleration_amount = target_acceleration.Length();
-            if (target_acceleration_amount > max_forward_acceleration)
-            {
-                forceThrusterGroup = systemsAnalyzer.SolveMaxThrust(Gravity_And_Unknown_Forces, Vector3.Normalize(target_acceleration), 1);
-                // Cannot be done in 1 frame so we just do max thrust
-            }
-            else
-            {
-                forceThrusterGroup = systemsAnalyzer.SolvePartialThrust(Gravity_And_Unknown_Forces, target_thrust);
-                // Can be done within 1 frame
-            }
-
 
             #region attempt 1
 
@@ -475,13 +506,10 @@ namespace IngameScript
 
             #endregion
 
-
-            
             SetResultantForces(forceThrusterGroup);
             
-            //SetResultantAcceleration(Gravity_And_Unknown_Forces, reverse_target_direction, 1);
-            //SetResultantAcceleration(Gravity_And_Unknown_Forces, -velocityDifference, accuracyRating);
-            shipIOHandler.EchoFinish(false, 1.6f);
+
+            return totalDistanceLeft;
         }
 
 
