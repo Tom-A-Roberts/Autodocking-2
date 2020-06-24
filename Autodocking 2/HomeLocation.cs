@@ -59,23 +59,35 @@ namespace IngameScript
             }
             const char main_delimeter = '¬';
             const char arg_delimeter = '`';
+
+
             public HomeLocation(string saved_data_string, Program parent_program)
             {
-                string[] data_parts = saved_data_string.Split(main_delimeter);
-                
-                long.TryParse(data_parts[0], out shipConnectorID);
-                long.TryParse(data_parts[1], out stationConnectorID);
-                Vector3D.TryParse(data_parts[2], out stationConnectorPosition);
-                Vector3D.TryParse(data_parts[3], out stationConnectorForward);
-                Vector3D.TryParse(data_parts[4], out stationConnectorUp);
-                stationConnectorName = data_parts[5];
 
-                string[] argument_parts = data_parts[6].Split(arg_delimeter);
-                foreach(string arg in argument_parts)
+                //parent_program.Echo(saved_data_string);
+
+                string[] data_parts = saved_data_string.Split(main_delimeter);
+
+                if (data_parts.Length != 7)
                 {
-                    arguments.Add(arg);
+                    shipConnector = null;
                 }
-                UpdateShipConnectorUsingID(parent_program);
+                else
+                {
+                    long.TryParse(data_parts[0], out shipConnectorID);
+                    long.TryParse(data_parts[1], out stationConnectorID);
+                    Vector3D.TryParse(data_parts[2], out stationConnectorPosition);
+                    Vector3D.TryParse(data_parts[3], out stationConnectorForward);
+                    Vector3D.TryParse(data_parts[4], out stationConnectorUp);
+                    stationConnectorName = data_parts[5];
+
+                    string[] argument_parts = data_parts[6].Split(arg_delimeter);
+                    foreach (string arg in argument_parts)
+                    {
+                        arguments.Add(arg);
+                    }
+                    UpdateShipConnectorUsingID(parent_program);
+                }
             }
 
             /// <summary>
@@ -115,8 +127,8 @@ namespace IngameScript
                 shipConnector = my_connector;
                 stationConnectorID = station_connector.EntityId;
                 stationConnectorPosition = station_connector.GetPosition();
-                stationConnectorForward = station_connector.WorldMatrix.Up;
-                stationConnectorUp = -station_connector.WorldMatrix.Forward;
+                stationConnectorForward = station_connector.WorldMatrix.Forward;
+                stationConnectorUp = station_connector.WorldMatrix.Up;
                 stationConnectorName = station_connector.CustomName;
                 
             }

@@ -63,10 +63,12 @@ namespace IngameScript
             Runtime.UpdateFrequency = UpdateFrequency.Once;
             platformVelocity = Vector3D.Zero;
             homeLocations = new List<HomeLocation>();
-            if (Storage.Length > 0)
-                RetrieveStorage();
 
             shipIOHandler = new IOHandler(this);
+
+            if (Storage.Length > 0)
+                RetrieveStorage();
+            
             systemsAnalyzer = new ShipSystemsAnalyzer(this);
             systemsController = new ShipSystemsController();
 
@@ -96,7 +98,11 @@ namespace IngameScript
             {
                 if(dataItem.Length > 0)
                 {
-                    homeLocations.Add(new HomeLocation(dataItem, this));
+                    HomeLocation newLoc = new HomeLocation(dataItem, this);
+                    if (newLoc.shipConnector != null)
+                    {
+                        homeLocations.Add(newLoc);
+                    }
                 }
             }
         }
@@ -112,21 +118,22 @@ namespace IngameScript
         }
 
         //Help from Whip.
-        void AlignWithGravity()
+        double AlignWithGravity(Waypoint waypoint)
         {
+            if (waypoint.RequireRotation)
+            {
             IMyShipConnector referenceBlock = systemsAnalyzer.currentHomeLocation.shipConnector;
 
             var referenceOrigin = referenceBlock.GetPosition();
-            var gravityVec = systemsAnalyzer.cockpit.GetNaturalGravity();
-            var gravityVecLength = gravityVec.Length();
-            if (gravityVec.LengthSquared() == 0)
+            var targetDirection = -waypoint.forward;
+            var gravityVecLength = targetDirection.Length();
+            if (targetDirection.LengthSquared() == 0)
             {
-                //Echo("No gravity");
                 foreach (IMyGyro thisGyro in systemsAnalyzer.gyros)
                 {
                     thisGyro.SetValue("Override", false);
                 }
-                return;
+                return -1;
             }
             //var block_WorldMatrix = referenceBlock.WorldMatrix;
             var block_WorldMatrix = VRageMath.Matrix.CreateWorld(referenceOrigin,
@@ -134,26 +141,31 @@ namespace IngameScript
                 -referenceBlock.WorldMatrix.Forward //referenceBlock.WorldMatrix.Up
             );
 
-            // var referenceForward = block_WorldMatrix.Forward;
-            // var referenceLeft = block_WorldMatrix.Left;
-            // var referenceUp = block_WorldMatrix.Up;
-
             var referenceForward = block_WorldMatrix.Forward;
             var referenceLeft = block_WorldMatrix.Left;
             var referenceUp = block_WorldMatrix.Up;
 
-            anglePitch = Math.Acos(MathHelper.Clamp(gravityVec.Dot(referenceForward) / gravityVecLength, -1, 1)) - Math.PI / 2;
-            Vector3D planetRelativeLeftVec = referenceForward.Cross(gravityVec);
+            //var referenceForward = -referenceBlock.WorldMatrix.Up;
+            //var referenceLeft = referenceBlock.WorldMatrix.Left;
+            //var referenceUp = referenceBlock.WorldMatrix.Forward;
+
+             anglePitch = Math.Acos(MathHelper.Clamp(targetDirection.Dot(referenceForward) / gravityVecLength, -1, 1)) - Math.PI / 2;
+            Vector3D planetRelativeLeftVec = referenceForward.Cross(targetDirection);
             angleRoll = PID.VectorAngleBetween(referenceLeft, planetRelativeLeftVec);
-            angleRoll *= PID.VectorCompareDirection(PID.VectorProjection(referenceLeft, gravityVec), gravityVec); //ccw is positive 
+            angleRoll *= PID.VectorCompareDirection(PID.VectorProjection(referenceLeft, targetDirection), targetDirection); //ccw is positive 
 
             anglePitch *= -1;
             angleRoll *= -1;
 
-            // Echo ("pitch angle:" + Math.Round ((anglePitch / Math.PI * 180), 2).ToString () + " deg");
-            // Echo ("roll angle:" + Math.Round ((angleRoll / Math.PI * 180), 2).ToString () + " deg");
+            //shipIOHandler.Echo("Pitch angle: " + Math.Round((anglePitch / Math.PI * 180), 2).ToString() + " deg");
+            //shipIOHandler.Echo("Roll angle: " + Math.Round((angleRoll / Math.PI * 180), 2).ToString() + " deg");
 
-            double rawDevAngle = Math.Acos(MathHelper.Clamp(gravityVec.Dot(referenceForward) / gravityVec.Length() * 180 / Math.PI, -1, 1));
+            //double rawDevAngle = Math.Acos(MathHelper.Clamp(targetDirection.Dot(referenceForward) / targetDirection.Length() * 180 / Math.PI, -1, 1));
+            double rawDevAngle = Math.Acos(MathHelper.Clamp(targetDirection.Dot(referenceForward), -1, 1)) * 180 / Math.PI;
+            rawDevAngle -= 90;
+
+            //shipIOHandler.Echo("Angle: " + rawDevAngle.ToString());
+
 
             double rollSpeed = rollPID.Control(angleRoll);
             double pitchSpeed = pitchPID.Control(anglePitch);
@@ -163,11 +175,12 @@ namespace IngameScript
             {
                 //do gyros
                 systemsController.ApplyGyroOverride(pitchSpeed, 0, -rollSpeed, systemsAnalyzer.gyros, block_WorldMatrix);
-
+            }
+            return rawDevAngle;
             }
             else
             {
-                return;
+                return -1;
             }
         }
 
@@ -238,6 +251,41 @@ namespace IngameScript
                 if (extra_info)
                     shipIOHandler.Echo("- Added new docking location.");
             }
+            //Check if any homelocations had that argument before, if so, remove it.
+            int amountFound = 0;
+            List<HomeLocation> toDelete = new List<HomeLocation>();
+            foreach (HomeLocation currentHomeLocation in homeLocations)
+            {
+                if (!currentHomeLocation.Equals(newHomeLocation)) {
+                    if (currentHomeLocation.arguments.Contains(argument))
+                    {
+                        amountFound += 1;
+
+                        currentHomeLocation.arguments.Remove(argument);
+                        if(currentHomeLocation.arguments.Count == 0)
+                        {
+                            toDelete.Add(currentHomeLocation);
+                        }
+                    }
+                }
+            }
+            //Predicate<Point> predicate1 = HasNoArguments;
+            while (toDelete.Count > 0)
+            {
+                homeLocations.Remove(toDelete[0]);
+                toDelete.RemoveAt(0);
+            }
+            
+
+            if (extra_info)
+            {
+                if(amountFound == 1)
+                    shipIOHandler.Echo("- Found 1 other association with that argument. Removed this other.");
+                else if(amountFound > 1)
+                    shipIOHandler.Echo("- Found " + amountFound.ToString() + " other associations with that argument. Removed these others.");
+            }
+                
+
             if (argument == "")
             {
                 if (!extra_info)
@@ -254,7 +302,6 @@ namespace IngameScript
             }
 
         }
-
 
         public void Main(string argument, UpdateType updateSource)
         {
@@ -342,14 +389,42 @@ namespace IngameScript
 
         void DockingSequenceFrameUpdate()
         {
-            //AlignWithGravity();
-            //Vector3D waypoint1 = new Vector3D(13310.29, 143907.58, -108825.71);
-            //double accuracy = MoveToWaypoint(waypoint1);
-
-
-
-
             shipIOHandler.DockingSequenceStartMessage(current_argument);
+
+
+            Vector3D ConnectorLocation = systemsAnalyzer.currentHomeLocation.stationConnectorPosition;
+            Vector3D ConnectorDirection = systemsAnalyzer.currentHomeLocation.stationConnectorForward;
+            Vector3D target_position = ConnectorLocation + (ConnectorDirection * 3);
+
+            Waypoint aboveConnectorWaypoint = new Waypoint(target_position, ConnectorDirection);
+
+            // Constantly ensure alignment
+            
+            double direction_accuracy = AlignWithGravity(aboveConnectorWaypoint);
+
+            if (Math.Abs(direction_accuracy) < 15)
+            {
+                
+
+                double location_accuracy = MoveToWaypoint(aboveConnectorWaypoint);
+            }
+            else
+            {
+                status = "Rotating";
+            }
+
+           
+
+            //shipIOHandler.WritePastableCoords(target_position, "Forward");
+            //shipIOHandler.WritePastableCoords(ConnectorLocation + (systemsAnalyzer.currentHomeLocation.stationConnectorUp * 5), "Up");
+
+            
+            //double accuracy = MoveToWaypoint(currentWaypoint);
+
+
+
+
+
             if (extra_info)
             {
                 shipIOHandler.Echo("Status: " + status);
@@ -360,10 +435,9 @@ namespace IngameScript
         }
 
         /// <summary>Equivalent to "Update()" from Unity but specifically for the docking sequence.</summary>
-        double MoveToWaypoint(Vector3D WaypointPosition)
+        double MoveToWaypoint(Waypoint waypoint)
         {
-
-            const double accuracy_allowance = 0.1;
+            double DeltaTime = Runtime.TimeSinceLastRun.TotalSeconds * 10;
 
             systemsAnalyzer.UpdateThrusterGroupsWorldDirections();
             
@@ -375,13 +449,13 @@ namespace IngameScript
             var UnknownAcceleration = Vector3.Zero;
             var Gravity_And_Unknown_Forces = (systemsAnalyzer.cockpit.GetTotalGravity() + UnknownAcceleration) * systemsAnalyzer.shipMass;
 
-            Vector3D TargetRoute = WaypointPosition - systemsAnalyzer.cockpit.GetPosition();
+            Vector3D TargetRoute = waypoint.position - systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
             Vector3D TargetDirection = Vector3D.Normalize(TargetRoute);
             double totalDistanceLeft = TargetRoute.Length();
 
 
             // Finding max forward thrust:
-            double LeadVelocity = (CurrentVelocity - platformVelocity).Length() + 1;
+            double LeadVelocity = (CurrentVelocity - platformVelocity).Length() + (DeltaTime * waypoint.maximumAcceleration);
             if (LeadVelocity > topSpeed)
             {
                 LeadVelocity = topSpeed;
@@ -474,7 +548,7 @@ namespace IngameScript
             //error_amount = Vector3D.Zero;
             #endregion
 
-            double DeltaTime =  Runtime.TimeSinceLastRun.TotalSeconds * 10;
+            
 
             double timeToGetToZero = 0;
             double distanceToGetToZero = 0;
@@ -485,11 +559,11 @@ namespace IngameScript
 
             if (max_reverse_acceleration != 0)
             {
-                timeToGetToZero = reverse_velocity_difference.Length() / (max_reverse_acceleration * (1 - caution));
+                timeToGetToZero = reverse_velocity_difference.Length() / (max_reverse_acceleration * (1 - caution) * waypoint.PercentageOfMaxAcceleration);
                 timeToGetToZero += DeltaTime;
                 distanceToGetToZero = (reverse_velocity_difference.Length() * timeToGetToZero) / 2;
             }
-            if (distanceToGetToZero + accuracy_allowance < totalDistanceLeft)
+            if (distanceToGetToZero + waypoint.required_accuracy < totalDistanceLeft)
             {
                 Accelerating = true;
             }
