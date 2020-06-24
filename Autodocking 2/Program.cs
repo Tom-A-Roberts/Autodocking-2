@@ -17,7 +17,7 @@ namespace IngameScript
         const double updatesPerSecond = 10;             // Defines how many times the script performes it's calculations per second.
         const double topSpeed = 100;                    // The top speed the ship will go, m/s.
         const double caution = 0.4;                     // Between 0 - 0.9. Defines how close to max deceleration the ship will ride.
-        bool extra_info = false;                  // If true, this script will give you more information about what's happening than usual.
+        bool extra_info = true;                  // If true, this script will give you more information about what's happening than usual.
 
         // DO NOT CHANGE BELOW THIS LINE \/ \/ \/
 
@@ -62,12 +62,15 @@ namespace IngameScript
             errorState = false;
             Runtime.UpdateFrequency = UpdateFrequency.Once;
             platformVelocity = Vector3D.Zero;
+            homeLocations = new List<HomeLocation>();
+            if (Storage.Length > 0)
+                RetrieveStorage();
 
             shipIOHandler = new IOHandler(this);
             systemsAnalyzer = new ShipSystemsAnalyzer(this);
             systemsController = new ShipSystemsController();
 
-            homeLocations = new List<HomeLocation>();
+            
 
             pitchPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
             rollPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
@@ -75,8 +78,12 @@ namespace IngameScript
             timeElapsed = 0;
             SafelyExit();
 
-            if(Storage.Length > 0)
-                RetrieveStorage();
+
+            //if (extra_info)
+            //{
+                
+            //}
+            //shipIOHandler.EchoFinish(false);
         }
 
         void RetrieveStorage()

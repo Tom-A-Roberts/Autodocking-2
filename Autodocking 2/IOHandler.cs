@@ -114,13 +114,15 @@ namespace IngameScript
 
             public void OutputHomeLocations()
             {
-                Echo("\n   Home location Data:");
+                Echo("Known docking locations:");
+                int count = 1;
                 foreach (HomeLocation currentHomeLocation in parent_program.homeLocations)
                 {
-                    Echo("Station conn: " + currentHomeLocation.stationConnectorName);
-                    IMyShipConnector my_connector = (IMyShipConnector)parent_program.GridTerminalSystem.GetBlockWithId(currentHomeLocation.shipConnectorID);
-                    Echo("Ship conn: " + my_connector.CustomName);
-                    string argStr = "ARGS: ";
+                    //Echo("Station connector: " + currentHomeLocation.stationConnectorName);
+                    //IMyShipConnector my_connector = (IMyShipConnector)parent_program.GridTerminalSystem.GetBlockWithId(currentHomeLocation.shipConnectorID);
+                    //Echo("Ship connector: " + my_connector.CustomName);
+
+                    string argStr = "- Location " + count.ToString() + " arguments: ";
                     foreach (string arg in currentHomeLocation.arguments)
                     {
                         string arg_r = arg;
@@ -129,9 +131,10 @@ namespace IngameScript
                             arg_r = "NO ARG";
                         }
                         argStr += arg_r + ", ";
-                    }
-                    Echo(argStr + "\n");
 
+                    }
+                    Echo(argStr.Substring(0, argStr.Length - 2));
+                    count += 1;
                 }
             }
             public string GetHomeLocationArguments(HomeLocation currentHomeLocation)
