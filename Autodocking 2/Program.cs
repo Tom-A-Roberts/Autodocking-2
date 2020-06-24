@@ -17,6 +17,7 @@ namespace IngameScript
         const double updatesPerSecond = 10;             // Defines how many times the script performes it's calculations per second.
         const double topSpeed = 100;                    // The top speed the ship will go, m/s.
         const double caution = 0.4;                     // Between 0 - 0.9. Defines how close to max deceleration the ship will ride.
+        bool extra_info = false;                  // If true, this script will give you more information about what's happening than usual.
 
         // DO NOT CHANGE BELOW THIS LINE \/ \/ \/
 
@@ -30,14 +31,17 @@ namespace IngameScript
         string current_argument;
         bool errorState = false;
         bool scriptEnabled = false;
+        string status = "";
         //string persistantText = "";
         double timeElapsed = 0;
-        List<HomeLocation> homeLocations = new List<HomeLocation>();
+        DateTime scriptStartTime;
+        List<HomeLocation> homeLocations;// = new List<HomeLocation>();
+
 
 
         // Ship vector math variables:
-        List<Vector3D> shipForwardLocal = new List<Vector3D>();
-        List<Vector3D> shipUpwardLocal = new List<Vector3D>();
+        //List<Vector3D> shipForwardLocal = new List<Vector3D>();
+        //List<Vector3D> shipUpwardLocal = new List<Vector3D>();
         double angleRoll = 0;
         double anglePitch = 0;
         PID pitchPID;
@@ -48,6 +52,7 @@ namespace IngameScript
         const double proportionalConstant = 2;
         const double derivativeConstant = .5;
         const double timeLimit = 1 / updatesPerSecond;
+        
 
         // Thanks to:
         // https://github.com/malware-dev/MDK-SE/wiki/Quick-Introduction-to-Space-Engineers-Ingame-Scripts
@@ -62,24 +67,54 @@ namespace IngameScript
             systemsAnalyzer = new ShipSystemsAnalyzer(this);
             systemsController = new ShipSystemsController();
 
+            homeLocations = new List<HomeLocation>();
+
             pitchPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
             rollPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
             
             timeElapsed = 0;
             SafelyExit();
+
+            if(Storage.Length > 0)
+                RetrieveStorage();
+        }
+
+        void RetrieveStorage()
+        {
+            //Data 
+            string[] two_halves = Storage.Split('#');
+            string[] home_location_data = two_halves[0].Split(';');
+
+            foreach (string dataItem in home_location_data)
+            {
+                if(dataItem.Length > 0)
+                {
+                    homeLocations.Add(new HomeLocation(dataItem, this));
+                }
+            }
+        }
+        void SaveStorage()
+        {
+            Storage = "";
+            //Data 
+            foreach (HomeLocation homeLocation in homeLocations)
+            {
+                Storage += homeLocation.ProduceSaveData() + ";";
+            }
+            Storage += "#";
         }
 
         //Help from Whip.
         void AlignWithGravity()
         {
-            IMyShipConnector referenceBlock = systemsAnalyzer.myConnector;
+            IMyShipConnector referenceBlock = systemsAnalyzer.currentHomeLocation.shipConnector;
 
             var referenceOrigin = referenceBlock.GetPosition();
             var gravityVec = systemsAnalyzer.cockpit.GetNaturalGravity();
             var gravityVecLength = gravityVec.Length();
             if (gravityVec.LengthSquared() == 0)
             {
-                Echo("No gravity");
+                //Echo("No gravity");
                 foreach (IMyGyro thisGyro in systemsAnalyzer.gyros)
                 {
                     thisGyro.SetValue("Override", false);
@@ -131,110 +166,127 @@ namespace IngameScript
 
         public void Save()
         {
-
+            SaveStorage();
         }
 
         /// <summary>Begins the ship docking sequence. Requires (Will require) a HomeLocation and argument.</summary><param name="beginConnector"></param><param name="argument"></param>
-        public void Begin(IMyShipConnector beginConnector, string argument) // WARNING, NEED TO ADD HOME LOCATION IN FUTURE INSTEAD
+        public void Begin(string argument) // WARNING, NEED TO ADD HOME LOCATION IN FUTURE INSTEAD
         {
-            //persistantText = "";
-            shipIOHandler.DockingSequenceStartMessage(argument);
-            current_argument = argument;
-            scriptEnabled = true;
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
-            systemsAnalyzer.myConnector = beginConnector;
-            shipIOHandler.OutputHomeLocations();
+            systemsAnalyzer.currentHomeLocation = FindHomeLocation(argument);
+            if (systemsAnalyzer.currentHomeLocation != null)
+            {
+                current_argument = argument;
+                scriptEnabled = true;
+                Runtime.UpdateFrequency = UpdateFrequency.Update1;
+                scriptStartTime = System.DateTime.Now;
+            }
+            else
+            {
+                SafelyExit();
+            }
+
         }
 
         public string updateHomeLocation(string argument, IMyShipConnector my_connected_connector)
         {
-            //List<IMyShipConnector> Connectors = new List<IMyShipConnector> ();
-            // if (my_connected_connector.Status == MyShipConnectorStatus.Connectable) {
-            //     my_connected_connector.Connect ();
-            // }
-            IMyShipConnector ship_connector = my_connected_connector.OtherConnector;
-            if (ship_connector == null)
+            IMyShipConnector station_connector = my_connected_connector.OtherConnector;
+            if (station_connector == null)
             {
                 shipIOHandler.Error("\nSomething went wrong when finding the connector.\nMaybe you have multiple connectors on the go, captain?");
                 return "";
             }
-
-            HomeLocation newHomeLocation = new HomeLocation(argument, my_connected_connector, ship_connector);
-
+            // We create a new home location, so that it can be compared with all the others.
+            HomeLocation newHomeLocation = new HomeLocation(argument, my_connected_connector, station_connector);
             int HomeLocationIndex = homeLocations.LastIndexOf(newHomeLocation);
             if (HomeLocationIndex != -1)
             {
-                shipIOHandler.Echo("\nHome location already In! Adding arg.");
+                // Docking location that was just created, already exists.
+                if (extra_info)
+                    shipIOHandler.Echo("- Docking location already Exists!\n- Adding argument.");
                 if (!homeLocations[HomeLocationIndex].arguments.Contains(argument))
                 {
+                    if (extra_info)
+                    {
+                        shipIOHandler.Echo("Other arguments associated: " + shipIOHandler.GetHomeLocationArguments(homeLocations[HomeLocationIndex]));
+                    }
                     homeLocations[HomeLocationIndex].arguments.Add(argument);
-                    shipIOHandler.Echo("\nArg added.");
+                    if (extra_info)
+                        shipIOHandler.Echo("- New argument added.");
                 }
-                else
+                else if (extra_info)
                 {
-                    shipIOHandler.Echo("\nArg already in!");
+                    shipIOHandler.Echo("- Argument already in!");
+                    if (extra_info)
+                    {
+                        shipIOHandler.Echo("All arguments associated: " + shipIOHandler.GetHomeLocationArguments(homeLocations[HomeLocationIndex]));
+                    }
                 }
+                
+                homeLocations[HomeLocationIndex].UpdateData(my_connected_connector, station_connector);
+
             }
             else
             {
                 homeLocations.Add(newHomeLocation);
-                shipIOHandler.Echo("\nAdded new home location.");
+                if (extra_info)
+                    shipIOHandler.Echo("- Added new docking location.");
             }
-
-            // if (homeLocations.Contains (argument)) {
-            //     if (homeLocations[argument].my_connector_ID != my_connected_connector.EntityId || homeLocations[argument].station_connector_ID != ship_connector.EntityId) {
-            //         homeLocations[argument].arguments.Remove (argument);
-            //         // if (homeLocations[argument].arguments.Count == 0) {
-            //         // }
-            //         homeLocations[argument] = new HomeLocation (argument, my_connected_connector, ship_connector);
-            //         //AKA the user has docked with a known argument using a new connector or it's a different location.
-
-            //         //Echo("");
-            //     }
-            // }
-
             if (argument == "")
             {
-                return "Saved home location as no argument";
+                if (!extra_info)
+                    return "SAVED\nSaved docking location as no argument";
+                else
+                    return "Saved docking location as no argument";
             }
             else
             {
-                return "Saved home location as:\n" + argument;
+                if (!extra_info)
+                    return "SAVED\nSaved docking location as: " + argument;
+                else
+                    return "Saved docking location as: " + argument;
             }
+
         }
+
 
         public void Main(string argument, UpdateType updateSource)
         {
 
             if ((updateSource & (UpdateType.Update1 | UpdateType.Once)) == 0)
             {
+                // Script is activated by pressing "Run"
                 if (errorState)
                 {
+                    // If an error has happened
                     errorState = false;
                     systemsAnalyzer.GatherBasicData();
                 }
                 if (!errorState)
                 {
+                    // script was activated and there was no error so far.
                     var my_connected_connector = systemsAnalyzer.FindMyConnectedConnector();
+                    //findConnectorCount += 1;
+                    //shipIOHandler.Echo("Finding connector: " + findConnectorCount.ToString());
+
                     if (my_connected_connector == null)
                     {
                         if (scriptEnabled && argument == current_argument)
                         {
                             // Script was already running, and using current argument, therefore this is a stopping order.
-                            shipIOHandler.Echo("STOPPED\nAwaiting orders, Your Grace");
+                            shipIOHandler.Echo("STOPPED\nAwaiting orders, Captain.");
                             SafelyExit();
                         }
                         else
                         {
                             // Request to dock initialized.
-                            Begin(systemsAnalyzer.myConnector, argument);
+                            Begin(argument);
                         }
                     }
                     else
                     {
                         var result = updateHomeLocation(argument, my_connected_connector);
                         shipIOHandler.Echo(result);
-                        shipIOHandler.Echo("\nThis location also has\nother arguments associated:");
+                        //shipIOHandler.Echo("\nThis location also has\nother arguments associated:");
                         SafelyExit();
                     }
                 }
@@ -254,17 +306,50 @@ namespace IngameScript
                 }
             }
         }
-
+        HomeLocation FindHomeLocation(string argument)
+        {
+            int amountFound = 0;
+            HomeLocation resultantHomeLocation = null;
+            foreach (HomeLocation currentHomeLocation in homeLocations)
+            {
+                if (currentHomeLocation.arguments.Contains(argument))
+                {
+                    amountFound += 1;
+                    if (resultantHomeLocation == null)
+                    {
+                        resultantHomeLocation = currentHomeLocation;
+                    }
+                }
+            }
+            if (amountFound > 1)
+            {
+                shipIOHandler.Echo("Minor Warning:\nThere are " + amountFound.ToString() + " places\nthat argument is associated with!\nPicking first one found.");
+            }
+            else if (amountFound == 0)
+            {
+                shipIOHandler.Echo("WARNING:\nNo docking location found with that argument.\nPlease dock to a connector and press 'Run' with your argument\nto save it as a docking location.");
+            }
+            return resultantHomeLocation;
+        }
 
 
         void DockingSequenceFrameUpdate()
         {
             //AlignWithGravity();
-            Vector3D waypoint1 = new Vector3D(13310.29, 143907.58, -108825.71);
-            double accuracy = MoveToWaypoint(waypoint1);
+            //Vector3D waypoint1 = new Vector3D(13310.29, 143907.58, -108825.71);
+            //double accuracy = MoveToWaypoint(waypoint1);
 
 
-            shipIOHandler.EchoFinish(false, 1.6f);
+
+
+            shipIOHandler.DockingSequenceStartMessage(current_argument);
+            if (extra_info)
+            {
+                shipIOHandler.Echo("Status: " + status);
+            }
+            TimeSpan elapsed = System.DateTime.Now - scriptStartTime;
+            shipIOHandler.Echo("\nTime elapsed: " + elapsed.Seconds.ToString() + "." + elapsed.Milliseconds.ToString().Substring(0,1));
+            shipIOHandler.EchoFinish(false);
         }
 
         /// <summary>Equivalent to "Update()" from Unity but specifically for the docking sequence.</summary>
@@ -278,7 +363,7 @@ namespace IngameScript
             var CurrentVelocity = systemsAnalyzer.cockpit.GetShipVelocities().LinearVelocity;
 
             ThrusterGroup forceThrusterGroup;
-            string status = "ERROR";
+            status = "ERROR";
 
             var UnknownAcceleration = Vector3.Zero;
             var Gravity_And_Unknown_Forces = (systemsAnalyzer.cockpit.GetTotalGravity() + UnknownAcceleration) * systemsAnalyzer.shipMass;
@@ -440,8 +525,8 @@ namespace IngameScript
                     status = "Finished";
                 }
             }
-
-            shipIOHandler.Echo("Status: " + status);
+            
+            //shipIOHandler.Echo("Status: " + status);
 
             #region attempt 1
 

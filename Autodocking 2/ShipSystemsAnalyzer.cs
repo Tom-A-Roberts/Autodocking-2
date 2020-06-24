@@ -32,7 +32,9 @@ namespace IngameScript
             /// <summary>The main Cockpit of the ship, used to define mass, "Forwards" and other coordinate systems.</summary>
             public IMyShipController cockpit;
 
-            public IMyShipConnector myConnector; // OUTDATED MUST CHANGE!
+            //Current status variables:
+            //public IMyShipConnector myConnector; // OUTDATED MUST CHANGE!
+            public HomeLocation currentHomeLocation;
 
             public List<IMyThrust> thrusters = new List<IMyThrust>();
             public List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
@@ -56,7 +58,7 @@ namespace IngameScript
             public ShipSystemsAnalyzer(Program in_parent_program)
             {
                 parent_program = in_parent_program;
-                parent_program.shipIOHandler.Echo("INITIALIZED\n");
+                parent_program.shipIOHandler.Echo("INITIALIZED");
                 GatherBasicData();
             }
 
@@ -295,16 +297,18 @@ namespace IngameScript
                     parent_program.shipIOHandler.Error("The ship systems analyzer couldn't find some sort of cockpit or remote control.\nPlease check you have one of these, captain.");
                 }
 
-                myConnector = FindConnector();
+                //myConnector = FindConnector();
                 thrusters = FindThrusters();
                 gyros = FindGyros();
                 if (!parent_program.errorState)
                 {
                     if (firstTime)
                     {
+                        if (parent_program.extra_info) { 
                         parent_program.shipIOHandler.Echo("Mass: " + shipMass.ToString());
                         parent_program.shipIOHandler.Echo("Thruster count: " + thrusters.Count.ToString());
                         parent_program.shipIOHandler.Echo("Gyro count: " + gyros.Count.ToString());
+                        }
                         parent_program.shipIOHandler.Echo("Waiting for orders, Your Highness.");
                         parent_program.shipIOHandler.EchoFinish(false);
                     }

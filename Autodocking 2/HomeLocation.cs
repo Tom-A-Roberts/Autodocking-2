@@ -16,6 +16,7 @@ using VRage.Game.ObjectBuilders.Definitions;
 using VRage.Game;
 using VRage;
 using VRageMath;
+using Sandbox.ModAPI;
 
 namespace IngameScript
 {
@@ -29,12 +30,13 @@ namespace IngameScript
         public class HomeLocation
         {
             public HashSet<string> arguments = new HashSet<string>();
-            public long my_connector_ID; // myConnector.EntityId;
-            public long station_connector_ID;
-            public string station_connector_name;
-            public Vector3D station_connector_position;
-            public Vector3D station_connector_forward;
-            public Vector3D station_connector_up;
+            public long shipConnectorID; // myConnector.EntityId;
+            public Sandbox.ModAPI.Ingame.IMyShipConnector shipConnector;
+            public long stationConnectorID;
+            public string stationConnectorName;
+            public Vector3D stationConnectorPosition;
+            public Vector3D stationConnectorForward;
+            public Vector3D stationConnectorUp;
 
             /// <summary>
             /// new_arg = the initial argument to be associated with this HomeLocation<br />
@@ -44,7 +46,7 @@ namespace IngameScript
             /// <param name="new_arg"></param>
             /// <param name="my_connector"></param>
             /// <param name="station_connector"></param>
-            public HomeLocation(string new_arg, IMyShipConnector my_connector, IMyShipConnector station_connector)
+            public HomeLocation(string new_arg, Sandbox.ModAPI.Ingame.IMyShipConnector my_connector, Sandbox.ModAPI.Ingame.IMyShipConnector station_connector)
             {
                 arguments.Add(new_arg);
                 UpdateData(my_connector, station_connector);
@@ -55,13 +57,51 @@ namespace IngameScript
                 //station_connector_up = -station_connector.WorldMatrix.Forward;
                 //station_connector_name = station_connector.CustomName;
             }
+            const char main_delimeter = '¬';
+            const char arg_delimeter = '`';
+            public HomeLocation(string saved_data_string, Program parent_program)
+            {
+                string[] data_parts = saved_data_string.Split(main_delimeter);
+                
+                long.TryParse(data_parts[0], out shipConnectorID);
+                long.TryParse(data_parts[1], out stationConnectorID);
+                Vector3D.TryParse(data_parts[2], out stationConnectorPosition);
+                Vector3D.TryParse(data_parts[3], out stationConnectorForward);
+                Vector3D.TryParse(data_parts[4], out stationConnectorUp);
+                stationConnectorName = data_parts[5];
+
+                string[] argument_parts = data_parts[6].Split(arg_delimeter);
+                foreach(string arg in argument_parts)
+                {
+                    arguments.Add(arg);
+                }
+                UpdateShipConnectorUsingID(parent_program);
+            }
+
             /// <summary>
             /// Serializes the HomeLocation into a string ready to be saved.
             /// </summary>
             /// <returns></returns>
             public string ProduceSaveData()
             {
-                return null;
+                string o_string = "";
+                o_string += shipConnectorID.ToString() + main_delimeter;
+                o_string += stationConnectorID.ToString() + main_delimeter;
+                o_string += stationConnectorPosition.ToString() + main_delimeter;
+                o_string += stationConnectorForward.ToString() + main_delimeter;
+                o_string += stationConnectorUp.ToString() + main_delimeter;
+                if(stationConnectorName.Contains(";") || stationConnectorName.Contains(main_delimeter) || stationConnectorName.Contains("#"))
+                {
+                    stationConnectorName = "Name contained bad char";
+                }
+                o_string += stationConnectorName + main_delimeter;
+
+                foreach (string arg in arguments)
+                {
+                    o_string += arg + arg_delimeter;
+                }o_string = o_string.Substring(0, o_string.Length - 1);
+
+                return o_string;
             }
             /// <summary>
             /// This method will update the HomeLocation information about the station connector position and orientation.<br />
@@ -69,15 +109,23 @@ namespace IngameScript
             /// </summary>
             /// <param name="my_connector"></param>
             /// <param name="station_connector"></param>
-            public void UpdateData(IMyShipConnector my_connector, IMyShipConnector station_connector)
+            public void UpdateData(Sandbox.ModAPI.Ingame.IMyShipConnector my_connector, Sandbox.ModAPI.Ingame.IMyShipConnector station_connector)
             {
-                my_connector_ID = my_connector.EntityId;
-                station_connector_ID = station_connector.EntityId;
-                station_connector_position = station_connector.GetPosition();
-                station_connector_forward = station_connector.WorldMatrix.Up;
-                station_connector_up = -station_connector.WorldMatrix.Forward;
-                station_connector_name = station_connector.CustomName;
+                shipConnectorID = my_connector.EntityId;
+                shipConnector = my_connector;
+                stationConnectorID = station_connector.EntityId;
+                stationConnectorPosition = station_connector.GetPosition();
+                stationConnectorForward = station_connector.WorldMatrix.Up;
+                stationConnectorUp = -station_connector.WorldMatrix.Forward;
+                stationConnectorName = station_connector.CustomName;
+                
             }
+
+            public void UpdateShipConnectorUsingID(Program parent_program)
+            {
+                shipConnector = (Sandbox.ModAPI.Ingame.IMyShipConnector)parent_program.GridTerminalSystem.GetBlockWithId(shipConnectorID);
+            }
+
             /// <summary>
             /// To test if two home locations are equal, both the station and ship connector ID's must match.
             /// </summary>
@@ -85,14 +133,14 @@ namespace IngameScript
             /// <returns></returns>
             public override bool Equals(Object obj)
             {
-                if ((obj == null) || this.GetType() == obj.GetType())
+                if ((obj == null) || this.GetType() != obj.GetType())
                 {
                     return false;
                 }
                 else
                 {
                     HomeLocation test = (HomeLocation)obj;
-                    if (my_connector_ID == test.my_connector_ID && station_connector_ID == test.station_connector_ID)
+                    if (shipConnectorID == test.shipConnectorID && stationConnectorID == test.stationConnectorID)
                     {
                         return true;
                     }
@@ -110,8 +158,8 @@ namespace IngameScript
             {
                 var hashCode = -48872655;
                 hashCode = hashCode * -1521134295 + EqualityComparer<HashSet<string>>.Default.GetHashCode(arguments);
-                hashCode = hashCode * -1521134295 + my_connector_ID.GetHashCode();
-                hashCode = hashCode * -1521134295 + station_connector_ID.GetHashCode();
+                hashCode = hashCode * -1521134295 + shipConnectorID.GetHashCode();
+                hashCode = hashCode * -1521134295 + stationConnectorID.GetHashCode();
                 // hashCode = hashCode * -1521134295 + EqualityComparer<string>.Default.GetHashCode (station_connector_name);
                 // hashCode = hashCode * -1521134295 + EqualityComparer<Vector3D>.Default.GetHashCode (station_connector_position);
                 // hashCode = hashCode * -1521134295 + EqualityComparer<Vector3D>.Default.GetHashCode (station_connector_forward);
