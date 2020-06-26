@@ -63,6 +63,14 @@ namespace IngameScript
                 else
                     return Math.Acos(MathHelper.Clamp(a.Dot(b) / a.Length() / b.Length(), -1, 1));
             }
+            public static Vector3D NearestPointOnLine(Vector3D linePoint, Vector3D lineDirection, Vector3D point)
+            {
+                Vector3D lineDir = Vector3D.Normalize(lineDirection);
+                var v = point - linePoint;
+                var d = v.Dot(lineDir);
+                return linePoint + lineDir * d;
+
+            }
 
             /// <summary>
             /// Credit to unknown dude off the internet for this crazy code.

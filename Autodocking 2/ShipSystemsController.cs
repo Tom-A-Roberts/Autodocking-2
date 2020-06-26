@@ -54,7 +54,14 @@ namespace IngameScript
                 double thrustProportion = thrustToApply / thrusterGroup.MaxThrust;
                 foreach (IMyThrust thisThruster in thrusterGroup.thrusters)
                 {
-                    thisThruster.ThrustOverride = (float)(thisThruster.MaxThrust * thrustProportion);
+                    if (thisThruster.IsWorking)
+                    {
+                        thisThruster.ThrustOverride = (float)(thisThruster.MaxThrust * thrustProportion);
+                    }
+                    else
+                    {
+                        
+                    }
                 }
             }
         }

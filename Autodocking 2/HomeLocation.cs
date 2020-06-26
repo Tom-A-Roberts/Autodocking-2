@@ -37,6 +37,7 @@ namespace IngameScript
             public Vector3D stationConnectorPosition;
             public Vector3D stationConnectorForward;
             public Vector3D stationConnectorUp;
+            public double stationConnectorSize;
 
             /// <summary>
             /// new_arg = the initial argument to be associated with this HomeLocation<br />
@@ -64,11 +65,9 @@ namespace IngameScript
             public HomeLocation(string saved_data_string, Program parent_program)
             {
 
-                //parent_program.Echo(saved_data_string);
-
                 string[] data_parts = saved_data_string.Split(main_delimeter);
 
-                if (data_parts.Length != 7)
+                if (data_parts.Length != 8)
                 {
                     shipConnector = null;
                 }
@@ -80,8 +79,9 @@ namespace IngameScript
                     Vector3D.TryParse(data_parts[3], out stationConnectorForward);
                     Vector3D.TryParse(data_parts[4], out stationConnectorUp);
                     stationConnectorName = data_parts[5];
+                    double.TryParse(data_parts[6], out stationConnectorSize);
 
-                    string[] argument_parts = data_parts[6].Split(arg_delimeter);
+                    string[] argument_parts = data_parts[7].Split(arg_delimeter);
                     foreach (string arg in argument_parts)
                     {
                         arguments.Add(arg);
@@ -107,6 +107,7 @@ namespace IngameScript
                     stationConnectorName = "Name contained bad char";
                 }
                 o_string += stationConnectorName + main_delimeter;
+                o_string += stationConnectorSize.ToString() + main_delimeter;
 
                 foreach (string arg in arguments)
                 {
@@ -130,7 +131,8 @@ namespace IngameScript
                 stationConnectorForward = station_connector.WorldMatrix.Forward;
                 stationConnectorUp = station_connector.WorldMatrix.Up;
                 stationConnectorName = station_connector.CustomName;
-                
+                stationConnectorSize = ShipSystemsAnalyzer.GetRadiusOfConnector(station_connector);
+
             }
 
             public void UpdateShipConnectorUsingID(Program parent_program)

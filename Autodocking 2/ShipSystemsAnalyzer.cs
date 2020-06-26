@@ -45,6 +45,8 @@ namespace IngameScript
             /// <summary>Mass of the ship in Kilograms, the last time the script was run. This is used to detect changes in the mass.</summary>
             public float previousShipMass = 9999;
 
+            public bool basicDataGatherRequired = false;
+
             /// <summary>Directions are with respect to the cockpit.</summary>
             public ThrusterGroup ForwardThrust;
             public ThrusterGroup UpThrust;
@@ -71,7 +73,7 @@ namespace IngameScript
             /// <returns></returns>
             public ThrusterGroup SolveMaxThrust(Vector3D minus_g, Vector3D targetDirection, double maxPercentageThrustToUse = 1)
             {
-
+                //parent_program.Echo("Starting");
                 Base6Directions.Direction actual2Di;
                 Base6Directions.Direction actual3Di;
                 double t2c;
@@ -89,6 +91,8 @@ namespace IngameScript
                 }
                 foreach (KeyValuePair<Base6Directions.Direction, ThrusterGroup> entry in thrusterGroups)
                 {
+                    //parent_program.Echo("Loading " + entry.Key.ToString());
+
                     t1 = entry.Value;
 
                     if (t1.LocalThrustDirection == Base6Directions.Direction.Up || t1.LocalThrustDirection == Base6Directions.Direction.Down)
@@ -165,6 +169,7 @@ namespace IngameScript
                     t1.finalThrusterGroups[3] = thrusterGroups[Base6Directions.GetOppositeDirection(t1.LocalThrustDirection)];
                     t1.finalThrusterGroups[4] = thrusterGroups[Base6Directions.GetOppositeDirection(t2.LocalThrustDirection)];
                     t1.finalThrusterGroups[5] = thrusterGroups[Base6Directions.GetOppositeDirection(t3.LocalThrustDirection)];
+                    //parent_program.Echo("Completed " + entry.Key.ToString());
                 }
 
                 ThrusterGroup bestCandidate = null;
@@ -181,6 +186,8 @@ namespace IngameScript
                         }
                     }
                 }
+                //parent_program.Echo("Finished");
+                //parent_program.Echo("Best: " + bestCandidate.LocalThrustDirection.ToString());
                 return bestCandidate;
 
             }
@@ -296,6 +303,7 @@ namespace IngameScript
                 {
                     parent_program.shipIOHandler.Error("The ship systems analyzer couldn't find some sort of cockpit or remote control.\nPlease check you have one of these, captain.");
                 }
+                parent_program.shipIOHandler.Echo("cockpit: " + cockpit.CustomName);
 
                 //myConnector = FindConnector();
                 thrusters = FindThrusters();
@@ -326,7 +334,23 @@ namespace IngameScript
             /// <summary>Checks if a given block is on the same grid as the programming block</summary><param name="block"></param><returns>bool</returns>
             public bool blockIsOnMyGrid(IMyTerminalBlock block)
             {
-                return block.CubeGrid.ToString() == parent_program.Me.CubeGrid.ToString();
+                return block.CubeGrid.EntityId == parent_program.Me.CubeGrid.EntityId;
+            }
+
+            public static double GetRadiusOfConnector(IMyShipConnector con)
+            {
+                //var blockDimensions = Vector3I.Transform(block.Max - block.Min + Vector3I.One, MatrixD.Transpose(block.Orientation.GetMatrix()));
+                //var point = block.GetPosition() + block.WorldMatrix.Forward * block.CubeGrid.GridSize * blockDimensions.Z * 0.5
+
+
+                if (con.CubeGrid.GridSize == 0.5)
+                {
+                    return con.CubeGrid.GridSize;
+                }
+                else
+                {
+                    return con.CubeGrid.GridSize * 0.5;
+                }
             }
 
             List<IMyThrust> FindThrusters()
@@ -337,7 +361,6 @@ namespace IngameScript
                 {
                     if (block is IMyThrust && block.IsWorking && blockIsOnMyGrid(block))
                     {
-
                         o_thrusters.Add((IMyThrust)block);
                     }
                 }
@@ -489,23 +512,27 @@ namespace IngameScript
                 double leftDot = 0;
                 foreach (IMyThrust thisThruster in thrusters)
                 {
-                    thrusterDirection = -thisThruster.WorldMatrix.Forward;
-                    forwardDot = Vector3D.Dot(thrusterDirection, cockpit.WorldMatrix.Forward);
-                    upDot = Vector3D.Dot(thrusterDirection, cockpit.WorldMatrix.Up);
-                    leftDot = Vector3D.Dot(thrusterDirection, cockpit.WorldMatrix.Left);
+                    if (thisThruster.IsWorking && blockIsOnMyGrid(thisThruster))
+                    {
+                        thrusterDirection = -thisThruster.WorldMatrix.Forward;
+                        forwardDot = Vector3D.Dot(thrusterDirection, cockpit.WorldMatrix.Forward);
+                        upDot = Vector3D.Dot(thrusterDirection, cockpit.WorldMatrix.Up);
+                        leftDot = Vector3D.Dot(thrusterDirection, cockpit.WorldMatrix.Left);
 
-                    if (forwardDot >= 0.97)
-                        thrusterGroups[Base6Directions.Direction.Forward].AddThruster(thisThruster);
-                    else if (leftDot >= 0.97)
-                        thrusterGroups[Base6Directions.Direction.Left].AddThruster(thisThruster);
-                    else if (upDot >= 0.97)
-                        thrusterGroups[Base6Directions.Direction.Up].AddThruster(thisThruster);
-                    else if (forwardDot <= -0.97)
-                        thrusterGroups[Base6Directions.Direction.Backward].AddThruster(thisThruster);
-                    else if (leftDot <= -0.97)
-                        thrusterGroups[Base6Directions.Direction.Right].AddThruster(thisThruster);
-                    else if (upDot <= -0.97)
-                        thrusterGroups[Base6Directions.Direction.Down].AddThruster(thisThruster);
+                        if (forwardDot >= 0.97)
+                            thrusterGroups[Base6Directions.Direction.Forward].AddThruster(thisThruster);
+                        else if (leftDot >= 0.97)
+                            thrusterGroups[Base6Directions.Direction.Left].AddThruster(thisThruster);
+                        else if (upDot >= 0.97)
+                            thrusterGroups[Base6Directions.Direction.Up].AddThruster(thisThruster);
+                        else if (forwardDot <= -0.97)
+                            thrusterGroups[Base6Directions.Direction.Backward].AddThruster(thisThruster);
+                        else if (leftDot <= -0.97)
+                            thrusterGroups[Base6Directions.Direction.Right].AddThruster(thisThruster);
+                        else if (upDot <= -0.97)
+                            thrusterGroups[Base6Directions.Direction.Down].AddThruster(thisThruster);
+                    }
+
 
                 }
             }
@@ -539,7 +566,7 @@ namespace IngameScript
 
             #region Debug
 
-            public void CheckForceFromThrusters(ThrusterGroup thrusterGroupToUse, Vector3D targetVector, Vector3D gravity_and_unknown)
+            public double CheckAccelerationFromThrusters(ThrusterGroup thrusterGroupToUse, Vector3D gravity_and_unknown)
             {
                 Vector3D totalThrusterForce = Vector3D.Zero;
                 
@@ -560,11 +587,8 @@ namespace IngameScript
                 }
 
                 Vector3D resultantNoGravT = totalThrusterForce + gravity_and_unknown;
-                double dot_ratingT = Vector3D.Dot(Vector3D.Normalize(targetVector), Vector3D.Normalize(resultantNoGravT));
-                if(dot_ratingT < 0.98 && dot_ratingT > -0.98)
-                {
-                    Echo("WARNING, direction dot is: " + dot_ratingT.ToString());
-                }
+
+                return resultantNoGravT.Length() / shipMass;
             }
 
             #endregion
