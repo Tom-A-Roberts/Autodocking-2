@@ -14,11 +14,17 @@ namespace IngameScript
 
         // CHANGEABLE VARIABLES:
 
+        int speedSetting = 2;                     // 1 = Cinematic, 2 = Classic, 3 = Breakneck
+                                                        // Cinematic: Slower but looks cooler, especially for larger ships.
+                                                        // Classic: Lands at a speed similar to a human.
+                                                        // Breakneck: Still safe, but will land pretty much as quick as it can.
+
         const double updatesPerSecond = 10;             // Defines how many times the script performes it's calculations per second.
-        const double topSpeed = 100;                    // The top speed the ship will go, m/s.
         const double caution = 0.4;                     // Between 0 - 0.9. Defines how close to max deceleration the ship will ride.
         bool extra_info = false;                  // If true, this script will give you more information about what's happening than usual.
 
+        // Preferably don't change:
+        //const double topSpeed = 100;                    
 
         // DO NOT CHANGE BELOW THIS LINE \/ \/ \/
 
@@ -36,7 +42,7 @@ namespace IngameScript
         //string persistantText = "";
         double timeElapsed = 0;
         DateTime scriptStartTime;
-        List<HomeLocation> homeLocations;// = new List<HomeLocation>();
+        List<HomeLocation> homeLocations;
 
 
         // Ship vector math variables:
@@ -45,6 +51,8 @@ namespace IngameScript
         PID pitchPID;
         PID rollPID;
         Vector3D platformVelocity;
+
+        double topSpeed = 100; // The top speed the ship will go, m/s. If brought low (e.g 10m/s), minor sideways overshoot of the connector can occur.
 
         // Script constants:
         const double proportionalConstant = 2;
@@ -269,16 +277,16 @@ namespace IngameScript
             if (argument == "")
             {
                 if (!extra_info)
-                    return "SAVED\nSaved docking location as no argument";
+                    return "SAVED\nSaved docking location as no argument, Captain.";
                 else
-                    return "Saved docking location as no argument";
+                    return "Saved docking location as no argument, Captain.";
             }
             else
             {
                 if (!extra_info)
-                    return "SAVED\nSaved docking location as: " + argument;
+                    return "SAVED\nSaved docking location as " + argument + ", Captain.";
                 else
-                    return "Saved docking location as: " + argument;
+                    return "Saved docking location as " + argument + ", Captain.";
             }
 
         }
@@ -386,9 +394,26 @@ namespace IngameScript
                 systemsAnalyzer.basicDataGatherRequired = false;
             }
 
-            const double sideways_dist_needed_to_land = 3;
-            const double height_needed_for_connector = 5;
-            
+            double sideways_dist_needed_to_land = 3;
+            double height_needed_for_connector = 5;
+
+                if (speedSetting == 1)
+                {
+                    height_needed_for_connector = 7;
+                    sideways_dist_needed_to_land = 5;
+                    topSpeed = 10;
+                }
+                else if (speedSetting == 3)
+                {
+                    height_needed_for_connector = 5;
+                    topSpeed = 100;
+                }
+                else
+                {
+                    height_needed_for_connector = 6;
+                    topSpeed = 100;
+                }
+
             Vector3D ConnectorLocation = systemsAnalyzer.currentHomeLocation.stationConnectorPosition;
             Vector3D ConnectorDirection = systemsAnalyzer.currentHomeLocation.stationConnectorForward;
             Vector3D target_position = ConnectorLocation + (ConnectorDirection * height_needed_for_connector);
@@ -421,13 +446,38 @@ namespace IngameScript
                     SomewhereOnCorrectSide.maximumAcceleration = 20;
                     SomewhereOnCorrectSide.required_accuracy = 0.8;
 
-                    MoveToWaypoint(SomewhereOnCorrectSide);
+                        if (speedSetting == 1)
+                        {
+                            aboveConnectorWaypoint.maximumAcceleration = 8;
+                        }
+                        else if (speedSetting == 3)
+                        {
+                            aboveConnectorWaypoint.maximumAcceleration = 20;
+                        }
+                        else
+                        {
+                            aboveConnectorWaypoint.maximumAcceleration = 15;
+                        }
+
+
+                        MoveToWaypoint(SomewhereOnCorrectSide);
                     point_in_sequence = "Behind target, moving to be in front";
                 }
                 else if(sidewaysDistance > sideways_dist_needed_to_land)
                 {
+                    if(speedSetting == 1)
+                        {
+                            aboveConnectorWaypoint.maximumAcceleration = 5;
+                        }
+                    else if(speedSetting == 3)
+                        {
+                            aboveConnectorWaypoint.maximumAcceleration = 15;
+                        }
+                    else
+                        {
+                            aboveConnectorWaypoint.maximumAcceleration = 10;
+                        }
                     
-                    aboveConnectorWaypoint.maximumAcceleration = 15;
 
                     MoveToWaypoint(aboveConnectorWaypoint);
                     point_in_sequence = "Moving toward connector";
@@ -437,6 +487,19 @@ namespace IngameScript
                     double connectorHeight = systemsAnalyzer.currentHomeLocation.stationConnectorSize + ShipSystemsAnalyzer.GetRadiusOfConnector(systemsAnalyzer.currentHomeLocation.shipConnector);
                     Waypoint DockedToConnector = new Waypoint(ConnectorLocation + (ConnectorDirection * connectorHeight), ConnectorDirection);
                     DockedToConnector.maximumAcceleration = 3;
+
+                        if (speedSetting == 1)
+                        {
+                            aboveConnectorWaypoint.maximumAcceleration = 1;
+                        }
+                        else if (speedSetting == 3)
+                        {
+                            aboveConnectorWaypoint.maximumAcceleration = 3;
+                        }
+                        else
+                        {
+                            aboveConnectorWaypoint.maximumAcceleration = 2;
+                        }
 
                     double acc = MoveToWaypoint(DockedToConnector);
                     point_in_sequence = "landing on connector";
@@ -592,23 +655,23 @@ namespace IngameScript
                     status = "Finished";
                 }
             }
-            if (ActualAcceleration.Length() < 0.5 && Math.Abs(forceThrusterGroup.lambdaResult / systemsAnalyzer.shipMass) > 0.5)
-            {
-                //issueDetection += DeltaTimeReal * 6;
-                if (issueDetection > 1.5)
-                {
-                    shipIOHandler.Echo("Warning:\nIt seems something is going wrong with ship acceleration.\nI will attempt to fix this and continue docking.\nIf it isn't docking still, please report this to Spug in the comments section of the script.\n");
-                }
+            //if (ActualAcceleration.Length() < 0.5 && Math.Abs(forceThrusterGroup.lambdaResult / systemsAnalyzer.shipMass) > 0.5)
+            //{
+            //    //issueDetection += DeltaTimeReal * 6;
+            //    if (issueDetection > 1.5)
+            //    {
+            //        shipIOHandler.Echo("Warning:\nIt seems something is going wrong with ship acceleration.\nI will attempt to fix this and continue docking.\nIf it isn't docking still, please report this to Spug in the comments section of the script.\n");
+            //    }
                 
-            }
-            else if (issueDetection > 0)
-            {
-                issueDetection -= DeltaTimeReal * 1;
-            }
-            else if(issueDetection < 0)
-            {
-                issueDetection = 0;
-            }
+            //}
+            //else if (issueDetection > 0)
+            //{
+            //    issueDetection -= DeltaTimeReal * 1;
+            //}
+            //else if(issueDetection < 0)
+            //{
+            //    issueDetection = 0;
+            //}
             SetResultantForces(forceThrusterGroup);
 
             previousVelocity = CurrentVelocity;

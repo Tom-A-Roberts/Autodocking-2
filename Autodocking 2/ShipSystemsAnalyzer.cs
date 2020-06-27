@@ -112,7 +112,7 @@ namespace IngameScript
                     }
                     else
                     {
-                        parent_program.shipIOHandler.Error("Encountered unusual thruster direction.\nIf you've gotten this error in particular,\nplease report this error to the script owner, Spug.");
+                        parent_program.shipIOHandler.Error("Encountered unusual thruster direction.\nIf you've gotten this error in particular,\nplease report it to the script owner, Spug.");
                         t2 = thrusterGroups[Base6Directions.Direction.Up];
                         t3 = thrusterGroups[Base6Directions.Direction.Left];
                     }
@@ -288,7 +288,7 @@ namespace IngameScript
                 parent_program.GridTerminalSystem.GetBlocks(blocks);
                 if (!firstTime && !parent_program.scriptEnabled)
                 {
-                    parent_program.shipIOHandler.Echo("RE-INITIALIZED\nSome change was detected\nso I have re-checked ship data.");
+                    parent_program.shipIOHandler.Echo("RE-INITIALIZED\nSome change was detected\nso I have re-checked ship data, Captain.");
                 }
 
 
@@ -301,7 +301,7 @@ namespace IngameScript
                 }
                 else
                 {
-                    parent_program.shipIOHandler.Error("The ship systems analyzer couldn't find some sort of cockpit or remote control.\nPlease check you have one of these, captain.");
+                    parent_program.shipIOHandler.Error("The ship systems analyzer couldn't find some sort of cockpit or remote control.\nPlease check you have one of these, Captain.");
                 }
                 
 
@@ -312,7 +312,7 @@ namespace IngameScript
                 {
                     if (firstTime)
                     {
-                        parent_program.shipIOHandler.Echo("Waiting for orders, Your Highness.\n");
+                        parent_program.shipIOHandler.Echo("Waiting for orders, Captain.\n");
                         if (parent_program.extra_info) { 
                         if(shipMass != 0)
                             {
@@ -514,6 +514,15 @@ namespace IngameScript
                 double forwardDot = 0;
                 double upDot = 0;
                 double leftDot = 0;
+                //Base6Directions.Direction
+                List<Base6Directions.Direction> unusedDirections = new List<Base6Directions.Direction>();
+                unusedDirections.Add(Base6Directions.Direction.Forward);
+                unusedDirections.Add(Base6Directions.Direction.Up);
+                unusedDirections.Add(Base6Directions.Direction.Left);
+                unusedDirections.Add(Base6Directions.Direction.Backward);
+                unusedDirections.Add(Base6Directions.Direction.Down);
+                unusedDirections.Add(Base6Directions.Direction.Right);
+
                 foreach (IMyThrust thisThruster in thrusters)
                 {
                     if (thisThruster.IsWorking && blockIsOnMyGrid(thisThruster))
@@ -523,22 +532,73 @@ namespace IngameScript
                         upDot = Vector3D.Dot(thrusterDirection, cockpit.WorldMatrix.Up);
                         leftDot = Vector3D.Dot(thrusterDirection, cockpit.WorldMatrix.Left);
 
-                        if (forwardDot >= 0.97)
-                            thrusterGroups[Base6Directions.Direction.Forward].AddThruster(thisThruster);
-                        else if (leftDot >= 0.97)
-                            thrusterGroups[Base6Directions.Direction.Left].AddThruster(thisThruster);
-                        else if (upDot >= 0.97)
-                            thrusterGroups[Base6Directions.Direction.Up].AddThruster(thisThruster);
-                        else if (forwardDot <= -0.97)
-                            thrusterGroups[Base6Directions.Direction.Backward].AddThruster(thisThruster);
-                        else if (leftDot <= -0.97)
-                            thrusterGroups[Base6Directions.Direction.Right].AddThruster(thisThruster);
-                        else if (upDot <= -0.97)
-                            thrusterGroups[Base6Directions.Direction.Down].AddThruster(thisThruster);
+                        Base6Directions.Direction foundDirection = Base6Directions.Direction.Forward;
+                        bool unset = true;
+
+                        if (forwardDot >= 0.97) {
+                            foundDirection = Base6Directions.Direction.Forward;
+                            unset = false;
+                        }
+                        else if (leftDot >= 0.97) {
+                            foundDirection = Base6Directions.Direction.Left;
+                            unset = false;
+                        }
+                        else if (upDot >= 0.97) {
+                            foundDirection = Base6Directions.Direction.Up;
+                            unset = false;
+                        }
+                        else if (forwardDot <= -0.97) {
+                            foundDirection = Base6Directions.Direction.Backward;
+                            unset = false;
+                        }
+                        else if (leftDot <= -0.97) {
+                            foundDirection = Base6Directions.Direction.Right;
+                            unset = false;
+                        }
+                        else if (upDot <= -0.97) {
+                            foundDirection = Base6Directions.Direction.Down;
+                            unset = false;
+                        }
+
+                        if (!unset)
+                        {
+                            thrusterGroups[foundDirection].AddThruster(thisThruster);
+                            if (unusedDirections.Contains(foundDirection))
+                            {
+                                unusedDirections.Remove(foundDirection);
+                            }
+                        }
+
+                        
+
+
+                        //if (forwardDot >= 0.97)
+                        //    thrusterGroups[Base6Directions.Direction.Forward].AddThruster(thisThruster);
+                        //else if (leftDot >= 0.97)
+                        //    thrusterGroups[Base6Directions.Direction.Left].AddThruster(thisThruster);
+                        //else if (upDot >= 0.97)
+                        //    thrusterGroups[Base6Directions.Direction.Up].AddThruster(thisThruster);
+                        //else if (forwardDot <= -0.97)
+                        //    thrusterGroups[Base6Directions.Direction.Backward].AddThruster(thisThruster);
+                        //else if (leftDot <= -0.97)
+                        //    thrusterGroups[Base6Directions.Direction.Right].AddThruster(thisThruster);
+                        //else if (upDot <= -0.97)
+                        //    thrusterGroups[Base6Directions.Direction.Down].AddThruster(thisThruster);
                     }
-
-
                 }
+                if (unusedDirections.Count == 6)
+                {
+                    parent_program.shipIOHandler.Error("Sorry Captain, I couldn't seem to find any thrusters on your ship.");
+                }
+                else if (unusedDirections.Count == 1)
+                {
+                    parent_program.shipIOHandler.Error("Sorry Captain, it's required that all 6 directions have at least one thruster.\nThe missing direction might be " + unusedDirections[0].ToString() + ".");
+                }
+                else if(unusedDirections.Count > 1)
+                {
+                    parent_program.shipIOHandler.Error("Sorry Captain, it's required that all 6 directions have at least one thruster.\nIt seems the missing directions might be: " + unusedDirections.ToString());
+                }
+
             }
 
             public void UpdateThrusterGroupsWorldDirections()
@@ -649,7 +709,7 @@ namespace IngameScript
             {
                 thrusters.Add(thruster);
                 MaxThrust += thruster.MaxEffectiveThrust;
-                thruster.CustomName = LocalThrustDirection.ToString() + " " + thrusters.Count.ToString();
+                //thruster.CustomName = LocalThrustDirection.ToString() + " " + thrusters.Count.ToString();
             }
 
             public void UpdateWorldDirection()
