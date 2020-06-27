@@ -17,7 +17,8 @@ namespace IngameScript
         const double updatesPerSecond = 10;             // Defines how many times the script performes it's calculations per second.
         const double topSpeed = 100;                    // The top speed the ship will go, m/s.
         const double caution = 0.4;                     // Between 0 - 0.9. Defines how close to max deceleration the ship will ride.
-        bool extra_info = true;                  // If true, this script will give you more information about what's happening than usual.
+        bool extra_info = false;                  // If true, this script will give you more information about what's happening than usual.
+
 
         // DO NOT CHANGE BELOW THIS LINE \/ \/ \/
 
@@ -38,10 +39,7 @@ namespace IngameScript
         List<HomeLocation> homeLocations;// = new List<HomeLocation>();
 
 
-
         // Ship vector math variables:
-        //List<Vector3D> shipForwardLocal = new List<Vector3D>();
-        //List<Vector3D> shipUpwardLocal = new List<Vector3D>();
         double angleRoll = 0;
         double anglePitch = 0;
         PID pitchPID;
@@ -70,7 +68,7 @@ namespace IngameScript
                 RetrieveStorage();
             
             systemsAnalyzer = new ShipSystemsAnalyzer(this);
-            systemsController = new ShipSystemsController();
+            systemsController = new ShipSystemsController(this);
 
             
 
@@ -79,13 +77,6 @@ namespace IngameScript
             
             timeElapsed = 0;
             SafelyExit();
-
-
-            //if (extra_info)
-            //{
-                
-            //}
-            //shipIOHandler.EchoFinish(false);
         }
 
         void RetrieveStorage()
@@ -105,16 +96,6 @@ namespace IngameScript
                     }
                 }
             }
-        }
-        void SaveStorage()
-        {
-            Storage = "";
-            //Data 
-            foreach (HomeLocation homeLocation in homeLocations)
-            {
-                Storage += homeLocation.ProduceSaveData() + ";";
-            }
-            Storage += "#";
         }
 
         //Help from Whip.
@@ -144,10 +125,6 @@ namespace IngameScript
             var referenceForward = block_WorldMatrix.Forward;
             var referenceLeft = block_WorldMatrix.Left;
             var referenceUp = block_WorldMatrix.Up;
-
-            //var referenceForward = -referenceBlock.WorldMatrix.Up;
-            //var referenceLeft = referenceBlock.WorldMatrix.Left;
-            //var referenceUp = referenceBlock.WorldMatrix.Forward;
 
              anglePitch = Math.Acos(MathHelper.Clamp(targetDirection.Dot(referenceForward) / gravityVecLength, -1, 1)) - Math.PI / 2;
             Vector3D planetRelativeLeftVec = referenceForward.Cross(targetDirection);
@@ -186,7 +163,13 @@ namespace IngameScript
 
         public void Save()
         {
-            SaveStorage();
+            Storage = "";
+            //Data 
+            foreach (HomeLocation homeLocation in homeLocations)
+            {
+                Storage += homeLocation.ProduceSaveData() + ";";
+            }
+            Storage += "#";
         }
 
         /// <summary>Begins the ship docking sequence. Requires (Will require) a HomeLocation and argument.</summary><param name="beginConnector"></param><param name="argument"></param>
@@ -271,14 +254,11 @@ namespace IngameScript
                     }
                 }
             }
-            //Predicate<Point> predicate1 = HasNoArguments;
             while (toDelete.Count > 0)
             {
                 homeLocations.Remove(toDelete[0]);
                 toDelete.RemoveAt(0);
             }
-            
-
             if (extra_info)
             {
                 if(amountFound == 1)
@@ -286,8 +266,6 @@ namespace IngameScript
                 else if(amountFound > 1)
                     shipIOHandler.Echo("- Found " + amountFound.ToString() + " other associations with that argument. Removed these others.");
             }
-                
-
             if (argument == "")
             {
                 if (!extra_info)
@@ -532,13 +510,7 @@ namespace IngameScript
                 forceThrusterGroup = systemsAnalyzer.SolveMaxThrust(Gravity_And_Unknown_Forces, forward_thrust_direction, 1);
                 if(forceThrusterGroup == null)
                 {
-                    Echo("Target direction: " + forward_thrust_direction.ToString());
-                    Echo("Gravity: " + (Gravity_And_Unknown_Forces / systemsAnalyzer.shipMass).ToString());
                     shipIOHandler.Error("Error when calculating required ship thrusts!\nError code 01");
-                }
-                if (forceThrusterGroup.lambdaResult == null)
-                {
-                    shipIOHandler.Error("Error when calculating required ship thrusts!\nError code 02");
                 }
                 max_forward_acceleration = forceThrusterGroup.lambdaResult / systemsAnalyzer.shipMass;
 
@@ -554,27 +526,22 @@ namespace IngameScript
             else
             {
                 Vector3D reverse_thrust_direction = -Vector3D.Normalize(TargetRoute);
-                //reverse_thrust_direction = -Vector3D.Normalize(reverse_velocity_difference);
                 forceThrusterGroup = systemsAnalyzer.SolveMaxThrust(Gravity_And_Unknown_Forces, reverse_thrust_direction, 1);
                 if (forceThrusterGroup == null)
                 {
-                    shipIOHandler.Error("Error when calculating required ship thrusts!\nError code 03");
-                }
-                if (forceThrusterGroup.lambdaResult == null)
-                {
-                    shipIOHandler.Error("Error when calculating required ship thrusts!\nError code 04");
+                    shipIOHandler.Error("Error when calculating required ship thrusts!\nError code 02");
                 }
                 max_reverse_acceleration = (forceThrusterGroup.lambdaResult) / systemsAnalyzer.shipMass;
             }
 
-            double timeToGetToZero = 0;
+            
             double distanceToGetToZero = 0;
-
             bool Accelerating = false;
 
 
             if (max_reverse_acceleration != 0)
             {
+                double timeToGetToZero = 0;
                 timeToGetToZero = reverse_velocity_difference.Length() / (max_reverse_acceleration * (1 - caution) * waypoint.PercentageOfMaxAcceleration);
                 timeToGetToZero += DeltaTime;
                 distanceToGetToZero = (reverse_velocity_difference.Length() * timeToGetToZero) / 2;
@@ -602,7 +569,6 @@ namespace IngameScript
                 {
                    
                     forceThrusterGroup = systemsAnalyzer.SolvePartialThrust(Gravity_And_Unknown_Forces, target_thrust);
-
                     // Can be done within 1 frame
                     status = "Drifting";
                 }
@@ -626,14 +592,9 @@ namespace IngameScript
                     status = "Finished";
                 }
             }
-
-            //shipIOHandler.Echo("target acc: " + IOHandler.RoundToSignificantDigits(forceThrusterGroup.lambdaResult / systemsAnalyzer.shipMass, 2).ToString());
-            //systemsAnalyzer.CheckForceFromThrusters(forceThrusterGroup, Gravity_And_Unknown_Forces);
-            //shipIOHandler.Echo("actual acc: " + IOHandler.RoundToSignificantDigits(ActualAcceleration.Length(), 2).ToString());
-
             if (ActualAcceleration.Length() < 0.5 && Math.Abs(forceThrusterGroup.lambdaResult / systemsAnalyzer.shipMass) > 0.5)
             {
-                issueDetection += DeltaTimeReal * 6;
+                //issueDetection += DeltaTimeReal * 6;
                 if (issueDetection > 1.5)
                 {
                     shipIOHandler.Echo("Warning:\nIt seems something is going wrong with ship acceleration.\nI will attempt to fix this and continue docking.\nIf it isn't docking still, please report this to Spug in the comments section of the script.\n");
@@ -648,8 +609,6 @@ namespace IngameScript
             {
                 issueDetection = 0;
             }
-
-
             SetResultantForces(forceThrusterGroup);
 
             previousVelocity = CurrentVelocity;
@@ -662,11 +621,6 @@ namespace IngameScript
         {
 
             ThrusterGroup maxForceThrusterGroup = systemsAnalyzer.SolveMaxThrust(-Gravity_And_Unknown_Forces, TargetForceDirection, proportionOfThrustToUse);
-
-            // Here for debug purposes:
-            //systemsAnalyzer.CheckForceFromThrusters(maxForceThrusterGroup, TargetForceDirection, Gravity_And_Unknown_Forces);
-
-
 
             // Set the unused thrusters to be off.
             systemsController.SetThrusterForces(maxForceThrusterGroup.finalThrusterGroups[3], 0);
@@ -749,7 +703,6 @@ namespace IngameScript
 
         void SafelyExit()
         {
-            //Runtime.UpdateFrequency = UpdateFrequency.Once;
             Runtime.UpdateFrequency |= UpdateFrequency.Update1;
             scriptEnabled = false;
             foreach (IMyGyro thisGyro in systemsAnalyzer.gyros)

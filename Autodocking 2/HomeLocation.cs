@@ -51,12 +51,6 @@ namespace IngameScript
             {
                 arguments.Add(new_arg);
                 UpdateData(my_connector, station_connector);
-                //my_connector_ID = my_connector.EntityId;
-                //station_connector_ID = station_connector.EntityId;
-                //station_connector_position = station_connector.GetPosition();
-                //station_connector_forward = station_connector.WorldMatrix.Up;
-                //station_connector_up = -station_connector.WorldMatrix.Forward;
-                //station_connector_name = station_connector.CustomName;
             }
             const char main_delimeter = '¬';
             const char arg_delimeter = '`';
@@ -116,6 +110,7 @@ namespace IngameScript
 
                 return o_string;
             }
+
             /// <summary>
             /// This method will update the HomeLocation information about the station connector position and orientation.<br />
             /// Requires the ship to be connected.
@@ -164,6 +159,7 @@ namespace IngameScript
                     }
                 }
             }
+
             /// <summary>
             /// Calculates the Hash Code of the HomeLocation based upon the arguments and two connector ID's.
             /// </summary>

@@ -303,7 +303,7 @@ namespace IngameScript
                 {
                     parent_program.shipIOHandler.Error("The ship systems analyzer couldn't find some sort of cockpit or remote control.\nPlease check you have one of these, captain.");
                 }
-                parent_program.shipIOHandler.Echo("cockpit: " + cockpit.CustomName);
+                
 
                 //myConnector = FindConnector();
                 thrusters = FindThrusters();
@@ -314,11 +314,15 @@ namespace IngameScript
                     {
                         parent_program.shipIOHandler.Echo("Waiting for orders, Your Highness.\n");
                         if (parent_program.extra_info) { 
-                        parent_program.shipIOHandler.Echo("Mass: " + shipMass.ToString());
+                        if(shipMass != 0)
+                            {
+                                parent_program.shipIOHandler.Echo("Mass: " + shipMass.ToString());
+                            }
                         parent_program.shipIOHandler.Echo("Thruster count: " + thrusters.Count.ToString());
                         parent_program.shipIOHandler.Echo("Gyro count: " + gyros.Count.ToString());
-                        //if (parent_program.homeLocations.Count > 0) {
-                                parent_program.shipIOHandler.OutputHomeLocations();
+                        parent_program.shipIOHandler.Echo("Main control: " + cockpit.CustomName);
+                            //if (parent_program.homeLocations.Count > 0) {
+                        parent_program.shipIOHandler.OutputHomeLocations();
                         //}
                         }
                         
