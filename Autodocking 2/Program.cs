@@ -18,14 +18,11 @@ namespace IngameScript
                                                         // Cinematic: Slower but looks cooler, especially for larger ships.
                                                         // Classic: Lands at a speed similar to a human.
                                                         // Breakneck: Still safe, but will land pretty much as quick as it can.
-
-        const double updatesPerSecond = 10;             // Defines how many times the script performes it's calculations per second.
         const double caution = 0.4;                     // Between 0 - 0.9. Defines how close to max deceleration the ship will ride.
-        bool extra_info = false;                  // If true, this script will give you more information about what's happening than usual.
-        string your_title = "Your Highness";        // How the ship will refer to you.
-
-        // Preferably don't change:
-        //const double topSpeed = 100;                    
+        bool extra_info = true;                  // If true, this script will give you more information about what's happening than usual.
+        string your_title = "Your Highness";        // How the ship will refer to you.    
+        bool small_ship_rotate_on_connector = true;     //If enabled, small ships will rotate on the connector to face the saved direction.
+        bool large_ship_rotate_on_connector = false;    //If enabled, large ships will rotate on the connector to face the saved direction.
 
         // DO NOT CHANGE BELOW THIS LINE \/ \/ \/
 
@@ -49,11 +46,14 @@ namespace IngameScript
         // Ship vector math variables:
         double angleRoll = 0;
         double anglePitch = 0;
+        double angleYaw = 0;
         PID pitchPID;
         PID rollPID;
+        PID yawPID;
         Vector3D platformVelocity;
 
         double topSpeed = 100; // The top speed the ship will go, m/s. If brought low (e.g 10m/s), minor sideways overshoot of the connector can occur.
+        const double updatesPerSecond = 10;             // Defines how many times the script performes it's calculations per second.
 
         // Script constants:
         const double proportionalConstant = 2;
@@ -83,7 +83,8 @@ namespace IngameScript
 
             pitchPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
             rollPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
-            
+            yawPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
+
             timeElapsed = 0;
             SafelyExit();
         }
@@ -108,7 +109,7 @@ namespace IngameScript
         }
 
         //Help from Whip.
-        double AlignWithGravity(Waypoint waypoint)
+        double AlignWithGravity(Waypoint waypoint, bool requireYawControl)
         {
             if (waypoint.RequireRotation)
             {
@@ -139,9 +140,21 @@ namespace IngameScript
             Vector3D planetRelativeLeftVec = referenceForward.Cross(targetDirection);
             angleRoll = PID.VectorAngleBetween(referenceLeft, planetRelativeLeftVec);
             angleRoll *= PID.VectorCompareDirection(PID.VectorProjection(referenceLeft, targetDirection), targetDirection); //ccw is positive 
+                if (requireYawControl)
+                {
+                    //angleYaw = 0;
+                    angleYaw = Math.Acos(MathHelper.Clamp(waypoint.up.Dot(referenceLeft), -1, 1)) - Math.PI / 2;
+                }
+                else
+                {
+                    angleYaw = 0;
+                }
+                //shipIOHandler.Echo("Angle Yaw: " + IOHandler.RoundToSignificantDigits(angleYaw, 2).ToString());
+                
 
             anglePitch *= -1;
             angleRoll *= -1;
+                
 
             //shipIOHandler.Echo("Pitch angle: " + Math.Round((anglePitch / Math.PI * 180), 2).ToString() + " deg");
             //shipIOHandler.Echo("Roll angle: " + Math.Round((angleRoll / Math.PI * 180), 2).ToString() + " deg");
@@ -155,12 +168,18 @@ namespace IngameScript
 
             double rollSpeed = rollPID.Control(angleRoll);
             double pitchSpeed = pitchPID.Control(anglePitch);
+            double yawSpeed = 0;
+            if (requireYawControl)
+            {
+                yawSpeed = yawPID.Control(angleYaw);
+                    
+            }
 
             //---Set appropriate gyro override  
             if (!errorState)
             {
                 //do gyros
-                systemsController.ApplyGyroOverride(pitchSpeed, 0, -rollSpeed, systemsAnalyzer.gyros, block_WorldMatrix);
+                systemsController.ApplyGyroOverride(pitchSpeed, yawSpeed, -rollSpeed, systemsAnalyzer.gyros, block_WorldMatrix);
             }
             return rawDevAngle;
             }
@@ -378,148 +397,167 @@ namespace IngameScript
 
         void DockingSequenceFrameUpdate()
         {
-            if (systemsAnalyzer.currentHomeLocation.shipConnector.Status == MyShipConnectorStatus.Connectable)
+            bool dontRotateOnConnector = ((!small_ship_rotate_on_connector && !systemsAnalyzer.isLargeShip) || (!large_ship_rotate_on_connector && systemsAnalyzer.isLargeShip));
+
+
+
+            if (systemsAnalyzer.currentHomeLocation.shipConnector.Status == MyShipConnectorStatus.Connected || (systemsAnalyzer.currentHomeLocation.shipConnector.Status == MyShipConnectorStatus.Connectable && dontRotateOnConnector))
             {
-                systemsAnalyzer.currentHomeLocation.shipConnector.Connect();
-                shipIOHandler.Echo("DOCKED\nThe ship has docked " + your_title + "!\nI will patiently await for more orders in the future.");
-                shipIOHandler.EchoFinish();
-                SafelyExit();
+                // If it's ready to dock, and we aren't rotating on the connector.
+                ConnectAndDock();
             }
             else
             {
-            shipIOHandler.DockingSequenceStartMessage(current_argument);
+                shipIOHandler.DockingSequenceStartMessage(current_argument);
 
-                if (systemsAnalyzer.basicDataGatherRequired)
-            {
-                systemsAnalyzer.GatherBasicData();
-                systemsAnalyzer.basicDataGatherRequired = false;
-            }
-
-            double sideways_dist_needed_to_land = 3;
-            double height_needed_for_connector = 5;
-
-                if (speedSetting == 1)
+                    if (systemsAnalyzer.basicDataGatherRequired)
                 {
-                    height_needed_for_connector = 7;
+                    systemsAnalyzer.GatherBasicData();
+                    systemsAnalyzer.basicDataGatherRequired = false;
+                }
+
+                double sideways_dist_needed_to_land = 3;
+                double height_needed_for_connector = 5;
+
+                    if (speedSetting == 1)
+                    {
+                        height_needed_for_connector = 7;
                     
-                    topSpeed = 10;
-                }
-                else if (speedSetting == 3)
-                {
-                    height_needed_for_connector = 4;
-                    topSpeed = 100;
-                }
-                else
-                {
-                    height_needed_for_connector = 6;
-                    topSpeed = 100;
-                }
-
-            Vector3D ConnectorLocation = systemsAnalyzer.currentHomeLocation.stationConnectorPosition;
-            Vector3D ConnectorDirection = systemsAnalyzer.currentHomeLocation.stationConnectorForward;
-            Vector3D target_position = ConnectorLocation + (ConnectorDirection * height_needed_for_connector);
-            Vector3D current_position = systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
-
-            string point_in_sequence = "Starting...";
-
-
-            Waypoint aboveConnectorWaypoint = new Waypoint(target_position, ConnectorDirection);
-
-            // Constantly ensure alignment
-            double direction_accuracy = AlignWithGravity(aboveConnectorWaypoint);
-
-
-            if (Math.Abs(direction_accuracy) < 15)
-            {
-                // Test if ship is behind the station connector:
-                Vector3D pointOnConnectorAxis = PID.NearestPointOnLine(ConnectorLocation, ConnectorDirection, current_position);
-                Vector3D heightDifference = pointOnConnectorAxis - ConnectorLocation;
-                double signedHeightDistanceToConnector = ConnectorDirection.Dot(Vector3D.Normalize(heightDifference)) * heightDifference.Length();
-                double sidewaysDistance = (current_position - pointOnConnectorAxis).Length();
-
-
-                if (sidewaysDistance > sideways_dist_needed_to_land && signedHeightDistanceToConnector < height_needed_for_connector * 0.9)
-                {
-                    // The ship is behind the connector, so it needs to fly up to it so that it is on the correct side at least.
-                    // Only then can it attempt to land.
-                    const double overshoot = 2;
-                    Waypoint SomewhereOnCorrectSide = new Waypoint(current_position + (ConnectorDirection * (-signedHeightDistanceToConnector + overshoot + height_needed_for_connector)), ConnectorDirection);
-                    SomewhereOnCorrectSide.maximumAcceleration = 20;
-                    SomewhereOnCorrectSide.required_accuracy = 0.8;
-
-                        if (speedSetting == 1)
-                        {
-                            aboveConnectorWaypoint.maximumAcceleration = 8;
-                        }
-                        else if (speedSetting == 3)
-                        {
-                            aboveConnectorWaypoint.maximumAcceleration = 20;
-                        }
-                        else
-                        {
-                            aboveConnectorWaypoint.maximumAcceleration = 15;
-                        }
-
-
-                        MoveToWaypoint(SomewhereOnCorrectSide);
-                    point_in_sequence = "Behind target, moving to be in front";
-                }
-                else if(sidewaysDistance > sideways_dist_needed_to_land)
-                {
-                    if(speedSetting == 1)
-                        {
-                            aboveConnectorWaypoint.maximumAcceleration = 5;
-                        }
-                    else if(speedSetting == 3)
-                        {
-                            aboveConnectorWaypoint.maximumAcceleration = 15;
-                        }
+                        topSpeed = 10;
+                    }
+                    else if (speedSetting == 3)
+                    {
+                        height_needed_for_connector = 4;
+                        topSpeed = 100;
+                    }
                     else
-                        {
-                            aboveConnectorWaypoint.maximumAcceleration = 10;
-                        }
-                    
+                    {
+                        height_needed_for_connector = 6;
+                        topSpeed = 100;
+                    }
 
-                    MoveToWaypoint(aboveConnectorWaypoint);
-                    point_in_sequence = "Moving toward connector";
+                Vector3D ConnectorLocation = systemsAnalyzer.currentHomeLocation.stationConnectorPosition;
+                Vector3D ConnectorDirection = systemsAnalyzer.currentHomeLocation.stationConnectorForward;
+                Vector3D ConnectorUp = systemsAnalyzer.currentHomeLocation.stationConnectorUp;
+                Vector3D target_position = ConnectorLocation + (ConnectorDirection * height_needed_for_connector);
+                Vector3D current_position = systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
+
+                string point_in_sequence = "Starting...";
+
+
+                Waypoint aboveConnectorWaypoint = new Waypoint(target_position, ConnectorDirection, ConnectorUp);
+
+                    // Constantly ensure alignment
+                double direction_accuracy;
+                bool connectedLate = false;
+                if (!dontRotateOnConnector && systemsAnalyzer.currentHomeLocation.shipConnector.Status == MyShipConnectorStatus.Connectable)
+                {
+                    direction_accuracy = AlignWithGravity(aboveConnectorWaypoint, true);
+                    if(Math.Abs(angleYaw) < 0.03)
+                    {
+                        ConnectAndDock();
+                        connectedLate = true;
+                    }
                 }
                 else
                 {
-                    double connectorHeight = systemsAnalyzer.currentHomeLocation.stationConnectorSize + ShipSystemsAnalyzer.GetRadiusOfConnector(systemsAnalyzer.currentHomeLocation.shipConnector);
-                    Waypoint DockedToConnector = new Waypoint(ConnectorLocation + (ConnectorDirection * connectorHeight), ConnectorDirection);
-                    DockedToConnector.maximumAcceleration = 3;
+                    direction_accuracy = AlignWithGravity(aboveConnectorWaypoint, false);
+                }
+                if (!connectedLate)
+                {
 
-                        if (speedSetting == 1)
+                    if (Math.Abs(direction_accuracy) < 15)
+                    {
+                        // Test if ship is behind the station connector:
+                        Vector3D pointOnConnectorAxis = PID.NearestPointOnLine(ConnectorLocation, ConnectorDirection, current_position);
+                        Vector3D heightDifference = pointOnConnectorAxis - ConnectorLocation;
+                        double signedHeightDistanceToConnector = ConnectorDirection.Dot(Vector3D.Normalize(heightDifference)) * heightDifference.Length();
+                        double sidewaysDistance = (current_position - pointOnConnectorAxis).Length();
+
+
+                        if (sidewaysDistance > sideways_dist_needed_to_land && signedHeightDistanceToConnector < height_needed_for_connector * 0.9)
                         {
-                            aboveConnectorWaypoint.maximumAcceleration = 1;
+                            // The ship is behind the connector, so it needs to fly up to it so that it is on the correct side at least.
+                            // Only then can it attempt to land.
+                            const double overshoot = 2;
+                            Waypoint SomewhereOnCorrectSide = new Waypoint(current_position + (ConnectorDirection * (-signedHeightDistanceToConnector + overshoot + height_needed_for_connector)), ConnectorDirection, ConnectorUp);
+                            SomewhereOnCorrectSide.maximumAcceleration = 20;
+                            SomewhereOnCorrectSide.required_accuracy = 0.8;
+
+                                if (speedSetting == 1)
+                                {
+                                    aboveConnectorWaypoint.maximumAcceleration = 8;
+                                }
+                                else if (speedSetting == 3)
+                                {
+                                    aboveConnectorWaypoint.maximumAcceleration = 20;
+                                }
+                                else
+                                {
+                                    aboveConnectorWaypoint.maximumAcceleration = 15;
+                                }
+
+
+                                MoveToWaypoint(SomewhereOnCorrectSide);
+                            point_in_sequence = "Behind target, moving to be in front";
                         }
-                        else if (speedSetting == 3)
+                        else if(sidewaysDistance > sideways_dist_needed_to_land)
                         {
-                            aboveConnectorWaypoint.maximumAcceleration = 3;
+                            if(speedSetting == 1)
+                                {
+                                    aboveConnectorWaypoint.maximumAcceleration = 5;
+                                }
+                            else if(speedSetting == 3)
+                                {
+                                    aboveConnectorWaypoint.maximumAcceleration = 15;
+                                }
+                            else
+                                {
+                                    aboveConnectorWaypoint.maximumAcceleration = 10;
+                                }
+                    
+
+                            MoveToWaypoint(aboveConnectorWaypoint);
+                            point_in_sequence = "Moving toward connector";
                         }
                         else
                         {
-                            aboveConnectorWaypoint.maximumAcceleration = 2;
+                            double connectorHeight = systemsAnalyzer.currentHomeLocation.stationConnectorSize + ShipSystemsAnalyzer.GetRadiusOfConnector(systemsAnalyzer.currentHomeLocation.shipConnector);
+                            Waypoint DockedToConnector = new Waypoint(ConnectorLocation + (ConnectorDirection * connectorHeight), ConnectorDirection, ConnectorUp);
+                            DockedToConnector.maximumAcceleration = 3;
+
+                                if (speedSetting == 1)
+                                {
+                                    aboveConnectorWaypoint.maximumAcceleration = 1;
+                                }
+                                else if (speedSetting == 3)
+                                {
+                                    aboveConnectorWaypoint.maximumAcceleration = 3;
+                                }
+                                else
+                                {
+                                    aboveConnectorWaypoint.maximumAcceleration = 2;
+                                }
+
+                            double acc = MoveToWaypoint(DockedToConnector);
+                            point_in_sequence = "landing on connector";
                         }
+                    }
+                    else
+                    {
+                        status = "Rotating";
+                        point_in_sequence = "Rotating to connector";
+                    }
+                        if (extra_info)
+                        {
+                            shipIOHandler.Echo("Status: " + status);
+                            shipIOHandler.Echo("Place in sequence: " + point_in_sequence);
+                        }
+                        TimeSpan elapsed = System.DateTime.Now - scriptStartTime;
+                        shipIOHandler.Echo("\nTime elapsed: " + elapsed.Seconds.ToString() + "." + elapsed.Milliseconds.ToString().Substring(0, 1));
+                        shipIOHandler.EchoFinish(false);
 
-                    double acc = MoveToWaypoint(DockedToConnector);
-                    point_in_sequence = "landing on connector";
                 }
-            }
-            else
-            {
-                status = "Rotating";
-                point_in_sequence = "Rotating to connector";
-            }
-
-            if (extra_info)
-            {
-                shipIOHandler.Echo("Status: " + status);
-                shipIOHandler.Echo("Place in sequence: " + point_in_sequence);
-            }
-            TimeSpan elapsed = System.DateTime.Now - scriptStartTime;
-            shipIOHandler.Echo("\nTime elapsed: " + elapsed.Seconds.ToString() + "." + elapsed.Milliseconds.ToString().Substring(0,1));
-            shipIOHandler.EchoFinish(false);
             }
         }
 
@@ -764,6 +802,14 @@ namespace IngameScript
             systemsController.SetThrusterForces(maxForceThrusterGroup.finalThrusterGroups[2], maxForceThrusterGroup.finalThrustForces.Z);
         }
 
+        void ConnectAndDock()
+        {
+            systemsAnalyzer.currentHomeLocation.shipConnector.Connect();
+            shipIOHandler.Clear();
+            shipIOHandler.Echo("DOCKED\nThe ship has docked " + your_title + "!\nI will patiently await for more orders in the future.");
+            shipIOHandler.EchoFinish();
+            SafelyExit();
+        }
 
         void SafelyExit()
         {

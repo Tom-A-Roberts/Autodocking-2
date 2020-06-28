@@ -124,7 +124,13 @@ namespace IngameScript
                 stationConnectorID = station_connector.EntityId;
                 stationConnectorPosition = station_connector.GetPosition();
                 stationConnectorForward = station_connector.WorldMatrix.Forward;
-                stationConnectorUp = station_connector.WorldMatrix.Up;
+
+                Vector3D normalizedleft = Vector3D.Normalize(PID.ProjectPointOnPlane(stationConnectorForward, Vector3D.Zero, my_connector.WorldMatrix.Left));
+                Vector3D saved_up = normalizedleft.Cross(stationConnectorForward);
+                stationConnectorUp = saved_up;
+                
+
+
                 stationConnectorName = station_connector.CustomName;
                 stationConnectorSize = ShipSystemsAnalyzer.GetRadiusOfConnector(station_connector);
 

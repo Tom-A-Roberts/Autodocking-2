@@ -52,7 +52,6 @@
     <Compile Include="Waypoint.cs" />
     <Compile Include="HomeLocation.cs" />
     <Compile Include="IOHandler.cs" />
-    <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="PID.cs" />
     <Compile Include="ShipSystemsAnalyzer.cs" />
     <Compile Include="MDK\Bootstrapper.cs" />

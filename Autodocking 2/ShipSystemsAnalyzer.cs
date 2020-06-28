@@ -44,6 +44,7 @@ namespace IngameScript
             public float shipMass = 9999;
             /// <summary>Mass of the ship in Kilograms, the last time the script was run. This is used to detect changes in the mass.</summary>
             public float previousShipMass = 9999;
+            public bool isLargeShip = false;
 
             public bool basicDataGatherRequired = false;
 
@@ -303,7 +304,14 @@ namespace IngameScript
                 {
                     parent_program.shipIOHandler.Error("The ship systems analyzer couldn't find some sort of cockpit or remote control.\nPlease check you have one of these, " + parent_program.your_title + ".");
                 }
-                
+                if(parent_program.Me.CubeGrid.GridSize == 0.5)
+                {
+                    isLargeShip = false;
+                }
+                else
+                {
+                    isLargeShip = true;
+                }
 
                 //myConnector = FindConnector();
                 thrusters = FindThrusters();
@@ -321,6 +329,7 @@ namespace IngameScript
                         parent_program.shipIOHandler.Echo("Thruster count: " + thrusters.Count.ToString());
                         parent_program.shipIOHandler.Echo("Gyro count: " + gyros.Count.ToString());
                         parent_program.shipIOHandler.Echo("Main control: " + cockpit.CustomName);
+                        parent_program.shipIOHandler.Echo("Is large ship: " + isLargeShip.ToString());
                             //if (parent_program.homeLocations.Count > 0) {
                         parent_program.shipIOHandler.OutputHomeLocations();
                         //}

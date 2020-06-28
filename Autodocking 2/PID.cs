@@ -72,6 +72,54 @@ namespace IngameScript
 
             }
 
+            public static Vector3D ProjectPointOnPlane(Vector3D planeNormal, Vector3D planePoint, Vector3D point)
+            {
+
+                double distance;
+                Vector3D translationVector;
+
+                //First calculate the distance from the point to the plane:
+                distance = SignedDistancePlanePoint(planeNormal, planePoint, point);
+
+                //Reverse the sign of the distance
+                distance *= -1;
+
+                //Get a translation vector
+                translationVector = SetVectorLength(planeNormal, distance);
+
+                //Translate the point to form a projection
+                return point + translationVector;
+            }
+
+
+
+            //Get the shortest distance between a point and a plane. The output is signed so it holds information
+            //as to which side of the plane normal the point is.
+            public static double SignedDistancePlanePoint(Vector3D planeNormal, Vector3D planePoint, Vector3D point)
+            {
+
+                return Vector3D.Dot(planeNormal, (point - planePoint));
+            }
+
+
+
+            //create a vector of direction "vector" with length "size"
+            public static Vector3D SetVectorLength(Vector3D vector, double size)
+            {
+
+                //normalize the vector
+                Vector3D vectorNormalized = Vector3D.Normalize(vector);
+
+                //scale the vector
+                return vectorNormalized *= size;
+            }
+
+
+
+
+
+
+
             /// <summary>
             /// Credit to unknown dude off the internet for this crazy code.
             /// </summary>

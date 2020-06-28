@@ -25,6 +25,7 @@ namespace IngameScript
         {
             public Vector3D position;
             public Vector3D forward;
+            public Vector3D up;
             public double required_accuracy = 0.1;
             /// <summary>
             /// 15 is fast but not great for doing final landing
@@ -39,10 +40,11 @@ namespace IngameScript
             public bool RequireRotation = true;
 
 
-            public Waypoint(Vector3D _pos, Vector3D _forward)
+            public Waypoint(Vector3D _pos, Vector3D _forward, Vector3D _up)
             {
                 position = _pos;
                 forward = _forward;
+                up = _up;
             }
         }
     }

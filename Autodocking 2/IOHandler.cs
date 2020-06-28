@@ -68,6 +68,10 @@ namespace IngameScript
             /// Use EchoFinish to output this accumulated line to the user.
             /// </summary>
             /// <param name="inp">Some object. This function applies .ToString() to it.</param>
+            public void Clear()
+            {
+                echoLine = "";
+            }
             public void Echo(Object inp)
             {
                 echoLine += inp.ToString() + "\n";

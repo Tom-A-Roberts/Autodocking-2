@@ -11,3 +11,4 @@ A script for Space Engineers that will automatically control and dock your in-ga
 - Look up how to calculate gyro spin speed, ready for flip-and-burn
 - Add "API" - activate timer with tag, once docked.
 - Allow not all 6 directions having thrust.
+- Allow clearing of memory
