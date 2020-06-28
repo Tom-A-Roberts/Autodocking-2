@@ -288,7 +288,7 @@ namespace IngameScript
                 parent_program.GridTerminalSystem.GetBlocks(blocks);
                 if (!firstTime && !parent_program.scriptEnabled)
                 {
-                    parent_program.shipIOHandler.Echo("RE-INITIALIZED\nSome change was detected\nso I have re-checked ship data, Captain.");
+                    parent_program.shipIOHandler.Echo("RE-INITIALIZED\nSome change was detected\nso I have re-checked ship data, " + parent_program.your_title + ".");
                 }
 
 
@@ -301,7 +301,7 @@ namespace IngameScript
                 }
                 else
                 {
-                    parent_program.shipIOHandler.Error("The ship systems analyzer couldn't find some sort of cockpit or remote control.\nPlease check you have one of these, Captain.");
+                    parent_program.shipIOHandler.Error("The ship systems analyzer couldn't find some sort of cockpit or remote control.\nPlease check you have one of these, " + parent_program.your_title + ".");
                 }
                 
 
@@ -312,7 +312,7 @@ namespace IngameScript
                 {
                     if (firstTime)
                     {
-                        parent_program.shipIOHandler.Echo("Waiting for orders, Captain.\n");
+                        parent_program.shipIOHandler.Echo("Waiting for orders, " + parent_program.your_title + ".\n");
                         if (parent_program.extra_info) { 
                         if(shipMass != 0)
                             {
@@ -326,12 +326,12 @@ namespace IngameScript
                         //}
                         }
                         
-                        parent_program.shipIOHandler.EchoFinish(false);
+                        
                     }
                 }
 
                 Populate6ThrusterGroups();
-
+                parent_program.shipIOHandler.EchoFinish(false);
                 firstTime = false;
             }
 
@@ -586,19 +586,26 @@ namespace IngameScript
                         //    thrusterGroups[Base6Directions.Direction.Down].AddThruster(thisThruster);
                     }
                 }
+                
                 if (unusedDirections.Count == 6)
                 {
-                    parent_program.shipIOHandler.Error("Sorry Captain, I couldn't seem to find any thrusters on your ship.");
+                    parent_program.shipIOHandler.Error("Sorry "+ parent_program.your_title +", I couldn't seem to find any thrusters on your ship.");
                 }
                 else if (unusedDirections.Count == 1)
                 {
-                    parent_program.shipIOHandler.Error("Sorry Captain, it's required that all 6 directions have at least one thruster.\nThe missing direction might be " + unusedDirections[0].ToString() + ".");
+                    parent_program.shipIOHandler.Error("Sorry "+ parent_program.your_title +", it's required that all 6 directions have at least one thruster.\nThe missing direction might be " + unusedDirections[0].ToString() + "."); //
                 }
                 else if(unusedDirections.Count > 1)
                 {
-                    parent_program.shipIOHandler.Error("Sorry Captain, it's required that all 6 directions have at least one thruster.\nIt seems the missing directions might be: " + unusedDirections.ToString());
-                }
+                    string total_string = "";
+                    foreach (Base6Directions.Direction di in unusedDirections)
+                    {
+                        total_string += di.ToString() + "-";
+                    }
 
+
+                    parent_program.shipIOHandler.Error("Sorry "+ parent_program.your_title +", it's required that all 6 directions have at least one thruster.\nIt seems the missing directions might be: " + total_string);// 
+                }
             }
 
             public void UpdateThrusterGroupsWorldDirections()

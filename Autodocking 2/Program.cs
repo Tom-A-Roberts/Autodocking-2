@@ -22,6 +22,7 @@ namespace IngameScript
         const double updatesPerSecond = 10;             // Defines how many times the script performes it's calculations per second.
         const double caution = 0.4;                     // Between 0 - 0.9. Defines how close to max deceleration the ship will ride.
         bool extra_info = false;                  // If true, this script will give you more information about what's happening than usual.
+        string your_title = "Your Highness";        // How the ship will refer to you.
 
         // Preferably don't change:
         //const double topSpeed = 100;                    
@@ -205,7 +206,7 @@ namespace IngameScript
             IMyShipConnector station_connector = my_connected_connector.OtherConnector;
             if (station_connector == null)
             {
-                shipIOHandler.Error("\nSomething went wrong when finding the connector.\nMaybe you have multiple connectors on the go, captain?");
+                shipIOHandler.Error("\nSomething went wrong when finding the connector.\nMaybe you have multiple connectors on the go, " + your_title + "?");
                 return "";
             }
             // We create a new home location, so that it can be compared with all the others.
@@ -277,16 +278,16 @@ namespace IngameScript
             if (argument == "")
             {
                 if (!extra_info)
-                    return "SAVED\nSaved docking location as no argument, Captain.";
+                    return "SAVED\nSaved docking location as no argument, " + your_title + ".";
                 else
-                    return "Saved docking location as no argument, Captain.";
+                    return "Saved docking location as no argument, " + your_title + ".";
             }
             else
             {
                 if (!extra_info)
-                    return "SAVED\nSaved docking location as " + argument + ", Captain.";
+                    return "SAVED\nSaved docking location as " + argument + ", " + your_title + ".";
                 else
-                    return "Saved docking location as " + argument + ", Captain.";
+                    return "Saved docking location as " + argument + ", " + your_title + ".";
             }
 
         }
@@ -315,7 +316,7 @@ namespace IngameScript
                         if (scriptEnabled && argument == current_argument)
                         {
                             // Script was already running, and using current argument, therefore this is a stopping order.
-                            shipIOHandler.Echo("STOPPED\nAwaiting orders, Captain.");
+                            shipIOHandler.Echo("STOPPED\nAwaiting orders, " + your_title + ".");
                             SafelyExit();
                         }
                         else
@@ -365,11 +366,11 @@ namespace IngameScript
             }
             if (amountFound > 1)
             {
-                shipIOHandler.Echo("Minor Warning:\nThere are " + amountFound.ToString() + " places\nthat argument is associated with!\nPicking first one found.");
+                shipIOHandler.Echo("Minor Warning:\nThere are " + amountFound.ToString() + " places\nthat argument is associated with!\nPicking first one found, " + your_title + ".");
             }
             else if (amountFound == 0)
             {
-                shipIOHandler.Echo("WARNING:\nNo docking location found with that argument.\nPlease dock to a connector and press 'Run' with your argument\nto save it as a docking location.");
+                shipIOHandler.Echo("WARNING:\nNo docking location found with that argument, " + your_title + ".\nPlease dock to a connector and press 'Run' with your argument\nto save it as a docking location.");
             }
             return resultantHomeLocation;
         }
@@ -380,7 +381,7 @@ namespace IngameScript
             if (systemsAnalyzer.currentHomeLocation.shipConnector.Status == MyShipConnectorStatus.Connectable)
             {
                 systemsAnalyzer.currentHomeLocation.shipConnector.Connect();
-                shipIOHandler.Echo("DOCKED\nThe ship has docked captain!\nI will patiently await for more orders in the future.");
+                shipIOHandler.Echo("DOCKED\nThe ship has docked " + your_title + "!\nI will patiently await for more orders in the future.");
                 shipIOHandler.EchoFinish();
                 SafelyExit();
             }
@@ -400,12 +401,12 @@ namespace IngameScript
                 if (speedSetting == 1)
                 {
                     height_needed_for_connector = 7;
-                    sideways_dist_needed_to_land = 5;
+                    
                     topSpeed = 10;
                 }
                 else if (speedSetting == 3)
                 {
-                    height_needed_for_connector = 5;
+                    height_needed_for_connector = 4;
                     topSpeed = 100;
                 }
                 else
@@ -766,16 +767,22 @@ namespace IngameScript
 
         void SafelyExit()
         {
+            
             Runtime.UpdateFrequency |= UpdateFrequency.Update1;
             scriptEnabled = false;
-            foreach (IMyGyro thisGyro in systemsAnalyzer.gyros)
+            if (systemsAnalyzer != null)
             {
-                thisGyro.SetValue("Override", false);
+                foreach (IMyGyro thisGyro in systemsAnalyzer.gyros)
+                {
+                    thisGyro.SetValue("Override", false);
+                }
+
+                foreach (IMyThrust thisThruster in systemsAnalyzer.thrusters)
+                {
+                    thisThruster.SetValue("Override", 0f);
+                }
             }
-            foreach (IMyThrust thisThruster in systemsAnalyzer.thrusters)
-            {
-                thisThruster.SetValue("Override", 0f);
-            }
+
         }
     }
 }
