@@ -507,7 +507,7 @@ namespace IngameScript
                                 }
                                 else
                                 {
-                                    aboveConnectorWaypoint.maximumAcceleration = 15;
+                                    aboveConnectorWaypoint.maximumAcceleration = 10;
                                 }
 
 
@@ -526,7 +526,7 @@ namespace IngameScript
                                 }
                             else
                                 {
-                                    aboveConnectorWaypoint.maximumAcceleration = 10;
+                                    aboveConnectorWaypoint.maximumAcceleration = 5;
                                 }
                     
 
@@ -549,7 +549,7 @@ namespace IngameScript
                                 }
                                 else
                                 {
-                                    aboveConnectorWaypoint.maximumAcceleration = 2;
+                                    aboveConnectorWaypoint.maximumAcceleration = 1;
                                 }
 
                             double acc = MoveToWaypoint(DockedToConnector);
