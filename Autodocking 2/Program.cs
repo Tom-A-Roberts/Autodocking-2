@@ -14,15 +14,18 @@ namespace IngameScript
 
         // CHANGEABLE VARIABLES:
 
-        int speedSetting = 2;                     // 1 = Cinematic, 2 = Classic, 3 = Breakneck
-                                                        // Cinematic: Slower but looks cooler, especially for larger ships.
-                                                        // Classic: Lands at a speed similar to a human.
-                                                        // Breakneck: Still safe, but will land pretty much as quick as it can.
-        const double caution = 0.4;                     // Between 0 - 0.9. Defines how close to max deceleration the ship will ride.
-        bool extra_info = true;                  // If true, this script will give you more information about what's happening than usual.
-        string your_title = "Your Highness";        // How the ship will refer to you.    
-        bool small_ship_rotate_on_connector = true;     //If enabled, small ships will rotate on the connector to face the saved direction.
-        bool large_ship_rotate_on_connector = false;    //If enabled, large ships will rotate on the connector to face the saved direction.
+        int speedSetting = 2;                       // 1 = Cinematic, 2 = Classic, 3 = Breakneck
+                                                                 // Cinematic: Slower but looks cooler, especially for larger ships.
+                                                                 // Classic: Lands at the classic pace.
+                                                                 // Breakneck: Still safe, but will land pretty much as quick as it can.
+        const double caution = 0.4;                                   // Between 0 - 0.9. Defines how close to max deceleration the ship will ride.
+        bool extra_info = false;                                            // If true, this script will give you more information about what's happening than usual.
+        string your_title = "Captain";                                  // How the ship will refer to you.
+        bool small_ship_rotate_on_connector = true;       //If enabled, small ships will rotate on the connector to face the saved direction.
+        bool large_ship_rotate_on_connector = false;      //If enabled, large ships will rotate on the connector to face the saved direction.
+        double topSpeed = 100;                                         // The top speed the ship will go in m/s. If brought low (e.g 10m/s), minor sideways overshoot of the connector can occur.
+
+
 
         // DO NOT CHANGE BELOW THIS LINE \/ \/ \/
 
@@ -52,9 +55,9 @@ namespace IngameScript
         PID yawPID;
         Vector3D platformVelocity;
 
-        double topSpeed = 100; // The top speed the ship will go, m/s. If brought low (e.g 10m/s), minor sideways overshoot of the connector can occur.
+        
         const double updatesPerSecond = 10;             // Defines how many times the script performes it's calculations per second.
-
+        double topSpeedUsed = 100;
         // Script constants:
         const double proportionalConstant = 2;
         const double derivativeConstant = .5;
@@ -415,26 +418,36 @@ namespace IngameScript
                     systemsAnalyzer.GatherBasicData();
                     systemsAnalyzer.basicDataGatherRequired = false;
                 }
+                
+                if(errorState == false)
+                {
 
+                
                 double sideways_dist_needed_to_land = 3;
+                double rotate_on_connector_accuracy = 0.015; // Radians
                 double height_needed_for_connector = 5;
 
                     if (speedSetting == 1)
                     {
                         height_needed_for_connector = 7;
                     
-                        topSpeed = 10;
+                        topSpeedUsed = 10;
                     }
                     else if (speedSetting == 3)
                     {
                         height_needed_for_connector = 4;
-                        topSpeed = 100;
+                        topSpeedUsed = topSpeed;
+                        rotate_on_connector_accuracy = 0.03;
                     }
                     else
                     {
                         height_needed_for_connector = 6;
-                        topSpeed = 100;
+                        topSpeedUsed = topSpeed;
                     }
+                    if(topSpeedUsed > topSpeed)
+                {
+                    topSpeedUsed = topSpeed;
+                }
 
                 Vector3D ConnectorLocation = systemsAnalyzer.currentHomeLocation.stationConnectorPosition;
                 Vector3D ConnectorDirection = systemsAnalyzer.currentHomeLocation.stationConnectorForward;
@@ -453,7 +466,7 @@ namespace IngameScript
                 if (!dontRotateOnConnector && systemsAnalyzer.currentHomeLocation.shipConnector.Status == MyShipConnectorStatus.Connectable)
                 {
                     direction_accuracy = AlignWithGravity(aboveConnectorWaypoint, true);
-                    if(Math.Abs(angleYaw) < 0.03)
+                    if(Math.Abs(angleYaw) < rotate_on_connector_accuracy)
                     {
                         ConnectAndDock();
                         connectedLate = true;
@@ -559,6 +572,7 @@ namespace IngameScript
 
                 }
             }
+            }
         }
 
         Vector3D previousVelocity = Vector3D.Zero;
@@ -594,9 +608,9 @@ namespace IngameScript
 
             // Finding max forward thrust:
             double LeadVelocity = (CurrentVelocity - platformVelocity).Length() + (DeltaTime * (waypoint.maximumAcceleration + issueDetection));
-            if (LeadVelocity > topSpeed)
+            if (LeadVelocity > topSpeedUsed)
             {
-                LeadVelocity = topSpeed;
+                LeadVelocity = topSpeedUsed;
             }
             Vector3D TargetVelocity = (TargetDirection * LeadVelocity) + platformVelocity;
             Vector3D velocityDifference = CurrentVelocity - TargetVelocity;
@@ -612,7 +626,7 @@ namespace IngameScript
                 forceThrusterGroup = systemsAnalyzer.SolveMaxThrust(Gravity_And_Unknown_Forces, forward_thrust_direction, 1);
                 if(forceThrusterGroup == null)
                 {
-                    shipIOHandler.Error("Error when calculating required ship thrusts!\nError code 01");
+                    shipIOHandler.Error("Error! Unknown forces going on! Maybe you have artificial masses, or docked ships using their thrusters or such.\nError code 01");
                 }
                 max_forward_acceleration = forceThrusterGroup.lambdaResult / systemsAnalyzer.shipMass;
 
@@ -631,7 +645,7 @@ namespace IngameScript
                 forceThrusterGroup = systemsAnalyzer.SolveMaxThrust(Gravity_And_Unknown_Forces, reverse_thrust_direction, 1);
                 if (forceThrusterGroup == null)
                 {
-                    shipIOHandler.Error("Error when calculating required ship thrusts!\nError code 02");
+                    shipIOHandler.Error("Error! Unknown forces going on! Maybe you have artificial masses, or docked ships using their thrusters or such.\nError code 02");
                 }
                 max_reverse_acceleration = (forceThrusterGroup.lambdaResult) / systemsAnalyzer.shipMass;
             }
@@ -820,12 +834,25 @@ namespace IngameScript
             {
                 foreach (IMyGyro thisGyro in systemsAnalyzer.gyros)
                 {
-                    thisGyro.SetValue("Override", false);
+                    if(thisGyro != null)
+                    {
+                        if (thisGyro.IsWorking)
+                        {
+                            thisGyro.SetValue("Override", false);
+                        }
+                    }
+                    
                 }
 
                 foreach (IMyThrust thisThruster in systemsAnalyzer.thrusters)
                 {
-                    thisThruster.SetValue("Override", 0f);
+                    if (thisThruster != null)
+                    {
+                        if (thisThruster.IsWorking)
+                        {
+                            thisThruster.SetValue("Override", 0f);
+                        }
+                    }
                 }
             }
 

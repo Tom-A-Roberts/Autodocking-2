@@ -100,18 +100,19 @@ namespace IngameScript
                 if (echoLine != "")
                 {
                     parent_program.Echo("= Spug's Auto Docking 2.0 =\n\n" + echoLine);
-                    if (!OnlyInProgrammingBlock)
-                    {
-                        IMyTextSurface surface = parent_program.GridTerminalSystem.GetBlockWithName("LCD Panel") as IMyTextSurface;
-                        if (surface != null)
-                        {
-                            surface.ContentType = ContentType.TEXT_AND_IMAGE;
-                            surface.FontSize = fontSize;
-                            surface.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
-                            surface.WriteText(echoLine);
-                        }
-                        echoLine = "";
-                    }
+                    //if (!OnlyInProgrammingBlock)
+                    //{
+                    //    IMyTextSurface surface = parent_program.GridTerminalSystem.GetBlockWithName("LCD Panel") as IMyTextSurface;
+                    //    if (surface != null)
+                    //    {
+                    //        surface.ContentType = ContentType.TEXT_AND_IMAGE;
+                    //        surface.FontSize = fontSize;
+                    //        surface.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
+                    //        surface.WriteText(echoLine);
+                    //    }
+                        
+                    //}
+                    echoLine = "";
                 }
             }
 
