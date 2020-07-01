@@ -577,22 +577,6 @@ namespace IngameScript
                                 unusedDirections.Remove(foundDirection);
                             }
                         }
-
-                        
-
-
-                        //if (forwardDot >= 0.97)
-                        //    thrusterGroups[Base6Directions.Direction.Forward].AddThruster(thisThruster);
-                        //else if (leftDot >= 0.97)
-                        //    thrusterGroups[Base6Directions.Direction.Left].AddThruster(thisThruster);
-                        //else if (upDot >= 0.97)
-                        //    thrusterGroups[Base6Directions.Direction.Up].AddThruster(thisThruster);
-                        //else if (forwardDot <= -0.97)
-                        //    thrusterGroups[Base6Directions.Direction.Backward].AddThruster(thisThruster);
-                        //else if (leftDot <= -0.97)
-                        //    thrusterGroups[Base6Directions.Direction.Right].AddThruster(thisThruster);
-                        //else if (upDot <= -0.97)
-                        //    thrusterGroups[Base6Directions.Direction.Down].AddThruster(thisThruster);
                     }
                 }
                 
