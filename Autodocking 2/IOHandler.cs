@@ -56,14 +56,36 @@ namespace IngameScript
                 EchoFinish(false);
             }
 
+            public void WritePastableCoords(Vector3D coords, string coord_name = "0")
+            {
+                //GPS:Spug #1:53571.5:-26605.41:12103.89:
+                Echo("GPS:" + coord_name + ":" + coords.X.ToString() + ":" + coords.Y.ToString() + ":" + coords.Z.ToString() + ":");
+            }
+
+
             /// <summary>
             /// Adds the input string (or object) to an accumulated line.<br />
             /// Use EchoFinish to output this accumulated line to the user.
             /// </summary>
             /// <param name="inp">Some object. This function applies .ToString() to it.</param>
+            public void Clear()
+            {
+                echoLine = "";
+            }
             public void Echo(Object inp)
             {
                 echoLine += inp.ToString() + "\n";
+            }
+            public static string ConvertArg(string argument)
+            {
+                if(argument == "")
+                {
+                    return "no argument";
+                }
+                else
+                {
+                    return argument;
+                }
             }
 
             /// <summary>
@@ -77,56 +99,88 @@ namespace IngameScript
             {
                 if (echoLine != "")
                 {
-                    parent_program.Echo(echoLine);
-                    if (!OnlyInProgrammingBlock)
-                    {
-                        IMyTextSurface surface = parent_program.GridTerminalSystem.GetBlockWithName("LCD Panel") as IMyTextSurface;
-                        if (surface != null)
-                        {
-                            surface.ContentType = ContentType.TEXT_AND_IMAGE;
-                            surface.FontSize = fontSize;
-                            surface.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
-                            surface.WriteText(echoLine);
-                        }
-                        echoLine = "";
-                    }
+                    parent_program.Echo("= Spug's Auto Docking 2.0 =\n\n" + echoLine);
+                    //if (!OnlyInProgrammingBlock)
+                    //{
+                    //    IMyTextSurface surface = parent_program.GridTerminalSystem.GetBlockWithName("LCD Panel") as IMyTextSurface;
+                    //    if (surface != null)
+                    //    {
+                    //        surface.ContentType = ContentType.TEXT_AND_IMAGE;
+                    //        surface.FontSize = fontSize;
+                    //        surface.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
+                    //        surface.WriteText(echoLine);
+                    //    }
+                        
+                    //}
+                    echoLine = "";
                 }
             }
 
 
             public void OutputHomeLocations()
             {
-                Echo("\n   Home location Data:");
+                Echo("Known docking locations:");
+                int count = 1;
                 foreach (HomeLocation currentHomeLocation in parent_program.homeLocations)
                 {
-                    Echo("Station conn: " + currentHomeLocation.station_connector_name);
-                    IMyShipConnector my_connector = (IMyShipConnector)parent_program.GridTerminalSystem.GetBlockWithId(currentHomeLocation.my_connector_ID);
-                    Echo("Ship conn: " + my_connector.CustomName);
-                    string argStr = "ARGS: ";
+                    //Echo("Station connector: " + currentHomeLocation.stationConnectorName);
+                    //IMyShipConnector my_connector = (IMyShipConnector)parent_program.GridTerminalSystem.GetBlockWithId(currentHomeLocation.shipConnectorID);
+                    //Echo("Ship connector: " + my_connector.CustomName);
+
+                    string argStr = "- Location " + count.ToString() + " arguments: ";
                     foreach (string arg in currentHomeLocation.arguments)
                     {
-                        argStr += arg + ", ";
-                    }
-                    Echo(argStr + "\n");
+                        string arg_r = arg;
+                        if(arg == "")
+                        {
+                            arg_r = "NO ARG";
+                        }
+                        argStr += arg_r + ", ";
 
+                    }
+                    Echo(argStr.Substring(0, argStr.Length - 2));
+                    count += 1;
                 }
+            }
+            public string GetHomeLocationArguments(HomeLocation currentHomeLocation)
+            {
+                //Echo("\n   Home location Data:");
+                //    Echo("Station connector: " + currentHomeLocation.stationConnectorName);
+                //    IMyShipConnector my_connector = (IMyShipConnector)parent_program.GridTerminalSystem.GetBlockWithId(currentHomeLocation.shipConnectorID);
+                //    Echo("Ship connector: " + my_connector.CustomName);
+                string argStr = "";// "Other arguments for this location: ";
+                
+                    foreach (string arg in currentHomeLocation.arguments)
+                    {
+                        string arg_r = arg;
+                        if (arg == "")
+                        {
+                            arg_r = "NO ARG";
+                        }
+                        argStr += arg_r + ", ";
+                    }
+                    if (argStr.Length > 2)
+                {
+                    argStr = argStr.Substring(0, argStr.Length - 2);
+                }
+                    return argStr;
             }
 
             public void DockingSequenceStartMessage(string argument)
             {
-                if (parent_program.scriptEnabled)
-                {
-                    if (argument == "")
-                    {
-                        Echo("RUNNING\nRe-starting docking sequence\nwith no argument.");
-                    }
-                    else
-                    {
-                        Echo("RUNNING\nRe-starting docking sequence\nwith new argument: " + argument);
-                    }
-                }
-                else
-                {
+                //if (parent_program.scriptEnabled)
+                //{
+                //    if (argument == "")
+                //    {
+                //        Echo("RUNNING\nRe-starting docking sequence\nwith no argument.");
+                //    }
+                //    else
+                //    {
+                //        Echo("RUNNING\nRe-starting docking sequence\nwith new argument: " + argument);
+                //    }
+                //}
+                //else
+                //{
                     if (argument == "")
                     {
                         Echo("RUNNING\nAttempting docking sequence\nwith no argument.");
@@ -135,7 +189,7 @@ namespace IngameScript
                     {
                         Echo("RUNNING\nAttempting docking sequence\nwith argument: " + argument);
                     }
-                }
+                //}
 
             }
 

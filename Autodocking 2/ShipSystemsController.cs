@@ -23,7 +23,12 @@ namespace IngameScript
     {
         public class ShipSystemsController
         {
-            //private readonly Program parent_program;
+            private readonly Program parent_program;
+
+            public ShipSystemsController(Program _parent_program)
+            {
+                parent_program = _parent_program;
+            }
 
             /// <summary>
             /// Overrides all the gyros on the ship and sets them to these specific speeds.
@@ -37,8 +42,11 @@ namespace IngameScript
             {
                 var rotationVec = new Vector3D(-pitch_speed, yaw_speed, roll_speed); //because keen does some weird stuff with signs 
                 var relativeRotationVec = Vector3D.TransformNormal(rotationVec, b_WorldMatrix);
+                bool hasDetected = false;
 
                 foreach (var thisGyro in gyro_list)
+                {
+                if (thisGyro.IsWorking)
                 {
                     var gyroMatrix = thisGyro.WorldMatrix;
                     var transformedRotationVec = Vector3D.TransformNormal(relativeRotationVec, Matrix.Transpose(gyroMatrix));
@@ -47,46 +55,31 @@ namespace IngameScript
                     thisGyro.Yaw = (float)transformedRotationVec.Y;
                     thisGyro.Roll = (float)transformedRotationVec.Z;
                     thisGyro.GyroOverride = true;
+                    }
+                else if(!hasDetected)
+                {
+                    parent_program.systemsAnalyzer.basicDataGatherRequired = true;
+                    parent_program.shipIOHandler.Echo("Warning:\nGyro damage detected, recomputing.");
+                    hasDetected = true;
                 }
             }
-
-            public void SetThrusterForces(
-                ShipSystemsAnalyzer.ThrusterForceAnalysis thrusterAnalysis,
-                double ForwardThrustToApply, double LeftThrustToApply, double UpThrustToApply)
-            {
-
-                double ForwardThrustProportion = ForwardThrustToApply / thrusterAnalysis.ForwardMaxThrust;
-                double LeftThrustProportion = LeftThrustToApply / thrusterAnalysis.LeftMaxThrust;
-                double UpThrustProportion = UpThrustToApply / thrusterAnalysis.UpMaxThrust;
-
-
-                foreach (IMyThrust thisThruster in thrusterAnalysis.ForceForwardThrusters)
-                {
-                    thisThruster.ThrustOverride = (float)(thisThruster.MaxThrust * ForwardThrustProportion);
-                    //thisThruster.ThrustOverride = thisThruster.MaxThrust;
-                }
-                foreach (IMyThrust thisThruster in thrusterAnalysis.ForceLeftThrusters)
-                {
-                    thisThruster.ThrustOverride = (float)(thisThruster.MaxThrust * (float)LeftThrustProportion);
-                    //thisThruster.ThrustOverride = thisThruster.MaxThrust;
-                }
-                foreach (IMyThrust thisThruster in thrusterAnalysis.ForceUpThrusters)
-                {
-                    thisThruster.ThrustOverride = (float)(thisThruster.MaxThrust * (float)UpThrustProportion);
-                    //thisThruster.ThrustOverride = thisThruster.MaxThrust;
-                }
-                foreach (IMyThrust thisThruster in thrusterAnalysis.UnusedThrusters)
-                {
-                    thisThruster.ThrustOverride = 0;
-                    //thisThruster.ThrustOverride = thisThruster.MaxThrust;
-                }
             }
             public void SetThrusterForces(ThrusterGroup thrusterGroup, double thrustToApply)
             {
                 double thrustProportion = thrustToApply / thrusterGroup.MaxThrust;
+                bool hasDetected = false;
                 foreach (IMyThrust thisThruster in thrusterGroup.thrusters)
                 {
-                    thisThruster.ThrustOverride = (float)(thisThruster.MaxThrust * thrustProportion);
+                    if (thisThruster.IsWorking)
+                    {
+                        thisThruster.ThrustOverride = (float)(thisThruster.MaxThrust * thrustProportion);
+                    }
+                    else if (!hasDetected)
+                    {
+                        parent_program.systemsAnalyzer.basicDataGatherRequired = true;
+                        parent_program.shipIOHandler.Echo("Warning:\nThruster damage detected, recomputing.");
+                        hasDetected = true;
+                    }
                 }
             }
         }
