@@ -1,7 +1,7 @@
 # Autodocking-2
 A script for Space Engineers that will automatically control and dock your in-game ship to a home connector.
 
-![](https://raw.githubusercontent.com/ksqk34/Autodocking-2/master/Autodocking%202/DockingSequence.gif)
+![](https://raw.githubusercontent.com/ksqk34/Autodocking-2/master/Autodocking%202/gifs/DockingSequence.gif)
 
 ## The Shiny New Version
 After not being able to maintain version 1 for a while, when I came back, it was a buggy mess. Even without the bugs there were flaws in the base code. Because of this, I decided to totally rewrite it with a new system.
@@ -14,7 +14,7 @@ My rotation code was also buggy. When the ship was very far from the (0,0,0) wor
 
 My old script had some great bugfixes from the community. I am glad they could spend the time looking through the code to find the fixes, and help others out with it. I think the Sparks of the Future update may have broken these for good though.
 
-![](https://raw.githubusercontent.com/ksqk34/Autodocking-2/master/Autodocking%202/DockingSequence4.gif)
+![](https://raw.githubusercontent.com/ksqk34/Autodocking-2/master/Autodocking%202/gifs/DockingSequence4.gif)
 
 ## Limitations
 Because this version was recently programmed, I prioritised code quality and reliability over features. I believe this was the right call, however features are still important, especially since my version 1 currently has more features than version 2.
