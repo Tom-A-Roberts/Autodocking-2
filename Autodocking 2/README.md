@@ -2,7 +2,7 @@
 A script for Space Engineers that will automatically control and dock your in-game ship to a home connector. This is the second iteration.
 
 *A cool gif of the script docking a small ship*
-![](Autodocking 2/DockingSequence.gif)
+![](DockingSequence.gif)
 
 ## The Shiny New Version
 After not being able to maintain version 1 for a while, when I came back, it was a buggy mess. Even without the bugs there were flaws in the base code. Because of this, I decided to totally rewrite it with a new system.
@@ -30,7 +30,7 @@ It's not as customizable as I'd like - There's only 7 changeable parameters. The
 Testing - while I have tested this on a fair amount of ships, I am but a one-man-band. This game allows players to create a huge variety of ships, I fear the boundaries of what I have thought up will be pushed too far by people.
 
 *Another cool gif of the script docking a bigger ship*
-![](Autodocking 2/DockingSequence4.gif)
+![](DockingSequence4.gif)
 
 
 ## Showcase Video
