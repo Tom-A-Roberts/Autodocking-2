@@ -4,10 +4,6 @@ A script for Space Engineers that will automatically control and dock your in-ga
 
 ![A cool gif about docking](https://raw.githubusercontent.com/ksqk34/Autodocking-2/master/Autodocking%202/gifs/DockingSequence.gif)
 
-## Showcase Video
-
-[![Showcase Video](http://img.youtube.com/vi/Ogm4yzAaqEg/0.jpg)](http://www.youtube.com/watch?v=Ogm4yzAaqEg)
-
 ## How the script works
 
 ### Overview
@@ -70,6 +66,10 @@ More comments need to be added. I'm aware my last script had lots of people look
 It's not as customizable as I'd like - There's only 7 changeable parameters. These can't be changed using the "Custom Data" field of the programming block either which is pretty standard in most scripts.
 
 Testing - while I have tested this on a fair amount of ships, I am but a one-man-band. This game allows players to create a huge variety of ships, I fear the boundaries of what I have thought up will be pushed too far by people.
+
+## Showcase Video
+
+[![Showcase Video](http://img.youtube.com/vi/Ogm4yzAaqEg/0.jpg)](http://www.youtube.com/watch?v=Ogm4yzAaqEg)
 
 ## To-do
 
