@@ -32,6 +32,7 @@ namespace IngameScript
         // Script systems:
         ShipSystemsAnalyzer systemsAnalyzer;
         ShipSystemsController systemsController;
+        AntennaHandler antennaHandler;
         IOHandler shipIOHandler;
 
 
@@ -64,6 +65,7 @@ namespace IngameScript
         const double timeLimit = 1 / updatesPerSecond;
         
 
+
         // Thanks to:
         // https://github.com/malware-dev/MDK-SE/wiki/Quick-Introduction-to-Space-Engineers-Ingame-Scripts
 
@@ -78,11 +80,13 @@ namespace IngameScript
 
             if (Storage.Length > 0)
                 RetrieveStorage();
-            
+
+            antennaHandler = new AntennaHandler(this);
             systemsAnalyzer = new ShipSystemsAnalyzer(this);
             systemsController = new ShipSystemsController(this);
-
             
+
+
 
             pitchPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
             rollPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
@@ -329,6 +333,14 @@ namespace IngameScript
                 if (!errorState)
                 {
                     // script was activated and there was no error so far.
+
+                    if(argument == "test")
+                    {
+                        antennaHandler.SendPositionUpdateRequest(1);
+
+                    }
+
+
                     var my_connected_connector = systemsAnalyzer.FindMyConnectedConnector();
                     //findConnectorCount += 1;
                     //shipIOHandler.Echo("Finding connector: " + findConnectorCount.ToString());
@@ -369,6 +381,15 @@ namespace IngameScript
                     DockingSequenceFrameUpdate();
                     timeElapsed = 0;
                 }
+            }
+
+
+            if ((updateSource & UpdateType.IGC) > 0)
+            {
+                
+                // Has recieved a message
+                antennaHandler.HandleMessage();
+                shipIOHandler.EchoFinish();
             }
         }
         HomeLocation FindHomeLocation(string argument)

@@ -316,11 +316,16 @@ namespace IngameScript
                 //myConnector = FindConnector();
                 thrusters = FindThrusters();
                 gyros = FindGyros();
+                string antenna_result = parent_program.antennaHandler.CheckAntenna();
                 if (!parent_program.errorState)
                 {
                     if (firstTime)
                     {
                         parent_program.shipIOHandler.Echo("Waiting for orders, " + parent_program.your_title + ".\n");
+                        if(antenna_result != "")
+                        {
+                            parent_program.shipIOHandler.Echo(antenna_result);
+                        }
                         if (parent_program.extra_info) { 
                         if(shipMass != 0)
                             {

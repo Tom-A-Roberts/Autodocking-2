@@ -49,6 +49,7 @@
   <Import Project="MDK/MDK.options.props" />
   <Import Project="MDK/MDK.paths.props" Condition="exists('MDK/MDK.paths.props')" />
   <ItemGroup>
+    <Compile Include="AntennaHandler.cs" />
     <Compile Include="Waypoint.cs" />
     <Compile Include="HomeLocation.cs" />
     <Compile Include="IOHandler.cs" />
