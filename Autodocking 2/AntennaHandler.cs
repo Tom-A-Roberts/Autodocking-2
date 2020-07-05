@@ -102,11 +102,17 @@ namespace IngameScript
                     MyIGCMessage myIGCMessage = _myBroadcastListener.AcceptMessage();
                     if (myIGCMessage.Tag == _recallRequestTag)
                     {
-                        string arg = myIGCMessage.Data.ToString();
+                        string data = myIGCMessage.Data.ToString();
+                        string[] data_parts = data.Split(';');
+                        string arg = data_parts[0];
+
+                        long sourceGrid = 0;
+                        long.TryParse(data_parts[1], out sourceGrid);
+
                         parent_program.shipIOHandler.Echo("Broadcast received. This ship has been ordered to dock.");
 
                         HomeLocation arg_test = parent_program.FindHomeLocation(arg);
-                        if(arg_test != null)
+                        if(arg_test != null && sourceGrid != parent_program.Me.CubeGrid.EntityId)
                         {
                             parent_program.Main(arg, UpdateType.Script);
                         }

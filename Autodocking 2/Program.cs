@@ -218,6 +218,9 @@ namespace IngameScript
             systemsAnalyzer.currentHomeLocation = FindHomeLocation(argument);
             if (systemsAnalyzer.currentHomeLocation != null)
             {
+                systemsAnalyzer.currentHomeLocation.stationVelocity = Vector3D.Zero;
+                systemsAnalyzer.currentHomeLocation.stationAcceleration = Vector3D.Zero;
+                systemsAnalyzer.currentHomeLocation.stationAngularVelocity = Vector3D.Zero;
                 current_argument = argument;
                 scriptEnabled = true;
                 hasConnectionToAntenna = false;
@@ -348,8 +351,6 @@ namespace IngameScript
                     // script was activated and there was no error so far.
 
                     var my_connected_connector = systemsAnalyzer.FindMyConnectedConnector();
-                    //findConnectorCount += 1;
-                    //shipIOHandler.Echo("Finding connector: " + findConnectorCount.ToString());
 
                     if (my_connected_connector == null)
                     {
@@ -505,7 +506,11 @@ namespace IngameScript
                 {
                     topSpeedUsed = topSpeed;
                 }
-
+                    if(systemsAnalyzer.currentHomeLocation.stationVelocity.Length() > 5)
+                    {
+                        rotate_on_connector_accuracy = 0.035;
+                        sideways_dist_needed_to_land = 5;
+                    }
 
                 Vector3D ConnectorLocation = systemsAnalyzer.currentHomeLocation.stationConnectorPosition;
                 Vector3D ConnectorDirection = systemsAnalyzer.currentHomeLocation.stationConnectorForward;
@@ -661,7 +666,7 @@ namespace IngameScript
             ThrusterGroup forceThrusterGroup = null;
             status = "ERROR";
 
-            var UnknownAcceleration = Vector3.Zero;
+            var UnknownAcceleration = -systemsAnalyzer.currentHomeLocation.stationAcceleration;
             var Gravity_And_Unknown_Forces = (systemsAnalyzer.cockpit.GetNaturalGravity() + UnknownAcceleration) * systemsAnalyzer.shipMass;
 
             Vector3D TargetRoute = (waypoint.position + (systemsAnalyzer.currentHomeLocation.stationVelocity * DeltaTimeReal)) - systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
