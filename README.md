@@ -18,19 +18,19 @@ This section will explain in a bit more detail how the script operates. In the s
 
 When landing, the ship goes through 4 major phases. These are done in sequence and I'll explain each below. Every time the script runs, it assesses the situation to determine what phase it is in. This means that the ship does not store any "state" between frames, it is constantly re-assessed, allowing a much higher level of robustness.
 
-#### Alignment
+#### 1. Alignment
 
 In this phase, the ship will simply hover and rotate. It will rotate using pitch and roll so that the connectors line up. To progress to the next phase, the connectors need to be aligned to within 15 degrees.
 
-#### Correction
+#### 2. Correction
 
 If the ship is behind the target connector, it needs to fly to be above it. It will do this "carelessly" - not worrying about stopping at the exact height level. To progress to the next stage, the ship needs to be at least 5 meters above the connector (roughly. This number changes with the speed setting).
 
-#### Waypointed Flight
+#### 3. Waypointed Flight
 
 The flight computer places an internal waypoint at a distance of 4 meters above the target connector (measured from connector center to connector center). The ship will fly directly at this, using "max possible thrust". The ship knows when to apply reverse burn because it works out the "max possible reverse thrust" by taking into account the thrust needed for gravity, the amount of thrusters in the direction, and the ship's mass. Any sideways velocities will be cancelled out during acceleration. The ship will aim to get to cruising at the top speed if it can. When the ship is within 4 meters of the connector (changes depending on speed setting), it progresses to the next stage.
 
-#### Precision Landing
+#### 4. Precision Landing
 
 While the "Precision Landing" name suggests a slow gentle landing, this phase is often very fast. This is because the ship only slows if it deems something is going wrong. An optimal landing is one where it is going at "max possible reverse thrust", and by the time it has reached speed 0, it is perfectly touching the connector. This is called a "suicide burn" by Elon Musk. The ship looks forward in time, sees where it will end up, looks at how badly that is wrong and adjusts accordingly, hence the precision.
 
