@@ -316,7 +316,11 @@ namespace IngameScript
                 //myConnector = FindConnector();
                 thrusters = FindThrusters();
                 gyros = FindGyros();
-                string antenna_result = parent_program.antennaHandler.CheckAntenna();
+                string antenna_result = "";
+                if (parent_program.enable_antenna_function)
+                {
+                    antenna_result = parent_program.antennaHandler.CheckAntenna();
+                }
                 if (!parent_program.errorState)
                 {
                     if (firstTime)

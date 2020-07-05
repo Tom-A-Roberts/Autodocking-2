@@ -33,11 +33,26 @@ namespace IngameScript
             public long shipConnectorID; // myConnector.EntityId;
             public Sandbox.ModAPI.Ingame.IMyShipConnector shipConnector;
             public long stationConnectorID;
-            public string stationConnectorName;
+            public long stationGridID;
             public Vector3D stationConnectorPosition;
             public Vector3D stationConnectorForward;
-            public Vector3D stationConnectorUp;
+            public Vector3D stationConnectorLeft;
+
+            // These are SAVED directions! NOT world matrix up
+            public Vector3D stationConnectorUpGlobal;
+            public Vector3D stationConnectorUpLocal;
+
+            
+            //public Vector3D stationConnectorUpGlobal;
+            //public Vector3D stationOriginalConnectorPosition;
+            //public Vector3D stationOriginalConnectorForward;
+            //public Vector3D stationOriginalConnectorUp;
+
             public double stationConnectorSize;
+
+            public Vector3D stationVelocity = Vector3D.Zero;
+            public Vector3D stationAngularVelocity = Vector3D.Zero;
+            public Vector3D stationAcceleration = Vector3D.Zero;
 
             /// <summary>
             /// new_arg = the initial argument to be associated with this HomeLocation<br />
@@ -60,27 +75,44 @@ namespace IngameScript
             {
 
                 string[] data_parts = saved_data_string.Split(main_delimeter);
-
-                if (data_parts.Length != 8)
-                {
-                    shipConnector = null;
-                }
-                else
+                if(data_parts.Length == 8)
                 {
                     long.TryParse(data_parts[0], out shipConnectorID);
                     long.TryParse(data_parts[1], out stationConnectorID);
                     Vector3D.TryParse(data_parts[2], out stationConnectorPosition);
                     Vector3D.TryParse(data_parts[3], out stationConnectorForward);
-                    Vector3D.TryParse(data_parts[4], out stationConnectorUp);
-                    stationConnectorName = data_parts[5];
+                    Vector3D.TryParse(data_parts[4], out stationConnectorUpGlobal);
+                    long.TryParse(data_parts[5], out stationGridID);
                     double.TryParse(data_parts[6], out stationConnectorSize);
-
                     string[] argument_parts = data_parts[7].Split(arg_delimeter);
                     foreach (string arg in argument_parts)
                     {
                         arguments.Add(arg);
                     }
                     UpdateShipConnectorUsingID(parent_program);
+                }
+                else if(data_parts.Length == 11)
+                {
+                    long.TryParse(data_parts[0], out shipConnectorID);
+                    long.TryParse(data_parts[1], out stationConnectorID);
+                    Vector3D.TryParse(data_parts[2], out stationConnectorPosition);
+                    Vector3D.TryParse(data_parts[3], out stationConnectorForward);
+                    Vector3D.TryParse(data_parts[4], out stationConnectorUpGlobal);
+                    Vector3D.TryParse(data_parts[5], out stationConnectorUpLocal);
+                    Vector3D.TryParse(data_parts[6], out stationConnectorLeft);
+                    long.TryParse(data_parts[7], out stationGridID);
+                    double.TryParse(data_parts[8], out stationConnectorSize);
+
+                    string[] argument_parts = data_parts[10].Split(arg_delimeter);
+                    foreach (string arg in argument_parts)
+                    {
+                        arguments.Add(arg);
+                    }
+                    UpdateShipConnectorUsingID(parent_program);
+                }
+                else
+                {
+                    shipConnector = null;
                 }
             }
 
@@ -95,13 +127,19 @@ namespace IngameScript
                 o_string += stationConnectorID.ToString() + main_delimeter;
                 o_string += stationConnectorPosition.ToString() + main_delimeter;
                 o_string += stationConnectorForward.ToString() + main_delimeter;
-                o_string += stationConnectorUp.ToString() + main_delimeter;
-                if(stationConnectorName.Contains(";") || stationConnectorName.Contains(main_delimeter) || stationConnectorName.Contains("#"))
-                {
-                    stationConnectorName = "Name contained bad char";
-                }
-                o_string += stationConnectorName + main_delimeter;
+                o_string += stationConnectorUpGlobal.ToString() + main_delimeter;
+                o_string += stationConnectorUpLocal.ToString() + main_delimeter;
+                o_string += stationConnectorLeft.ToString() + main_delimeter;
+
+                //if(stationGridID.Contains(";") || stationGridID.Contains(main_delimeter) || stationGridID.Contains("#"))
+                //{
+                //    stationGridID = "Name contained bad char";
+                //}
+                o_string += stationGridID.ToString() + main_delimeter;
                 o_string += stationConnectorSize.ToString() + main_delimeter;
+
+                o_string += "NULL for future update" + main_delimeter;
+                //Matrix transformMat = Matrix.
 
                 foreach (string arg in arguments)
                 {
@@ -124,21 +162,64 @@ namespace IngameScript
                 stationConnectorID = station_connector.EntityId;
                 stationConnectorPosition = station_connector.GetPosition();
                 stationConnectorForward = station_connector.WorldMatrix.Forward;
+                stationConnectorLeft = station_connector.WorldMatrix.Left;
 
                 Vector3D normalizedleft = Vector3D.Normalize(PID.ProjectPointOnPlane(stationConnectorForward, Vector3D.Zero, my_connector.WorldMatrix.Left));
                 Vector3D saved_up = normalizedleft.Cross(stationConnectorForward);
-                stationConnectorUp = saved_up;
-                
+                stationConnectorUpGlobal = saved_up;
+                stationConnectorUpLocal = worldDirectionToLocalDirection(stationConnectorUpGlobal, station_connector.WorldMatrix);
 
 
-                stationConnectorName = station_connector.CustomName;
+
+                stationGridID = station_connector.CubeGrid.EntityId;
                 stationConnectorSize = ShipSystemsAnalyzer.GetRadiusOfConnector(station_connector);
-
             }
+
+            public static Vector3D worldDirectionToLocalDirection(Vector3D world_direction, MatrixD world_matrix)
+            {
+                return Vector3D.TransformNormal(world_direction, MatrixD.Transpose(world_matrix));
+            }
+
+            public static Vector3D localDirectionToWorldDirection(Vector3D local_direction, MatrixD world_matrix)
+            {
+                return Vector3D.TransformNormal(local_direction, world_matrix);
+            }
+
+            //public double angleFromVectors(Vector3D )
+            //{
+
+            //}
 
             public void UpdateShipConnectorUsingID(Program parent_program)
             {
                 shipConnector = (Sandbox.ModAPI.Ingame.IMyShipConnector)parent_program.GridTerminalSystem.GetBlockWithId(shipConnectorID);
+            }
+
+            public string UpdateDataFromOptionalHomeScript(string[] data_parts)
+            {
+                string issuestring = "";
+                if (data_parts.Length == 6)
+                {
+                    // THEREFORE SCRIPT IS OLD
+                    Vector3D.TryParse(data_parts[0], out stationConnectorPosition);
+                    Vector3D.TryParse(data_parts[1], out stationConnectorForward);
+                    Vector3D.TryParse(data_parts[2], out stationConnectorLeft);
+                    Vector3D.TryParse(data_parts[3], out stationVelocity);
+                    Vector3D.TryParse(data_parts[4], out stationAngularVelocity);
+                    Vector3D.TryParse(data_parts[5], out stationAcceleration);
+
+                    if(stationConnectorUpLocal != Vector3D.Zero)
+                    {
+                        MatrixD newWorldMatrix = VRageMath.Matrix.CreateWorld(stationConnectorPosition, stationConnectorForward, (-stationConnectorLeft).Cross(stationConnectorForward));
+                        Vector3D newConnectorUpGlobal = localDirectionToWorldDirection(stationConnectorUpLocal, newWorldMatrix);
+                        stationConnectorUpGlobal = newConnectorUpGlobal;
+                    }
+                }
+                else
+                {
+                    issuestring = "Warning:\nGot a corrupted message back from the optional home script.\nMaybe it is an old version?";
+                }
+                return issuestring;
             }
 
             /// <summary>

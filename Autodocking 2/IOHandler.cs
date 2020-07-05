@@ -99,7 +99,11 @@ namespace IngameScript
             {
                 if (echoLine != "")
                 {
-                    parent_program.Echo("= Spug's Auto Docking 2.0 =\n\n" + echoLine);
+                    if(parent_program.runningIssues.Length > 0)
+                    {
+                        parent_program.runningIssues += "\n";
+                    }
+                    parent_program.Echo("= Spug's Auto Docking 2.0 =\n\n" + parent_program.runningIssues + echoLine);
                     //if (!OnlyInProgrammingBlock)
                     //{
                     //    IMyTextSurface surface = parent_program.GridTerminalSystem.GetBlockWithName("LCD Panel") as IMyTextSurface;

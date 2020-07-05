@@ -19,13 +19,14 @@ namespace IngameScript
                                                                  // Classic: Lands at the classic pace.
                                                                  // Breakneck: Still safe, but will land pretty much as quick as it can.
         const double caution = 0.4;                                   // Between 0 - 0.9. Defines how close to max deceleration the ship will ride.
-        bool extra_info = false;                                            // If true, this script will give you more information about what's happening than usual.
+        bool extra_info = false;                                           // If true, this script will give you more information about what's happening than usual.
         string your_title = "Captain";                                  // How the ship will refer to you.
         bool small_ship_rotate_on_connector = true;       //If enabled, small ships will rotate on the connector to face the saved direction.
         bool large_ship_rotate_on_connector = false;      //If enabled, large ships will rotate on the connector to face the saved direction.
         double topSpeed = 100;                                         // The top speed the ship will go in m/s. If brought low (e.g 10m/s), minor sideways overshoot of the connector can occur.
+        bool extra_soft_landing_mode = false;                 // If your ship is hitting your connector too had, enable this.
 
-
+        bool enable_antenna_function = true;                  //If enabled, the ship will try to search for an optional home script. Disable if the antenna functionality is giving you problems.
 
         // DO NOT CHANGE BELOW THIS LINE \/ \/ \/
 
@@ -41,8 +42,11 @@ namespace IngameScript
         bool errorState = false;
         bool scriptEnabled = false;
         string status = "";
+        string runningIssues = "";
         //string persistantText = "";
         double timeElapsed = 0;
+        double timeElapsedSinceAntennaCheck = 0;
+        bool hasConnectionToAntenna = false;
         DateTime scriptStartTime;
         List<HomeLocation> homeLocations;
 
@@ -93,6 +97,7 @@ namespace IngameScript
             yawPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
 
             timeElapsed = 0;
+            timeElapsedSinceAntennaCheck = 0;
             SafelyExit();
         }
 
@@ -215,10 +220,17 @@ namespace IngameScript
             {
                 current_argument = argument;
                 scriptEnabled = true;
+                hasConnectionToAntenna = false;
+                runningIssues = "";
                 Runtime.UpdateFrequency = UpdateFrequency.Update1;
                 scriptStartTime = System.DateTime.Now;
                 previousTime = System.DateTime.Now;
                 previousVelocity = systemsAnalyzer.cockpit.GetShipVelocities().LinearVelocity;
+
+                if (enable_antenna_function)
+                {
+                    antennaHandler.SendPositionUpdateRequest(1);
+                }
             }
             else
             {
@@ -321,7 +333,8 @@ namespace IngameScript
         public void Main(string argument, UpdateType updateSource)
         {
 
-            if ((updateSource & (UpdateType.Update1 | UpdateType.Once)) == 0)
+            if ((updateSource & (UpdateType.Update1 | UpdateType.Once | UpdateType.IGC)) == 0)
+            
             {
                 // Script is activated by pressing "Run"
                 if (errorState)
@@ -333,13 +346,6 @@ namespace IngameScript
                 if (!errorState)
                 {
                     // script was activated and there was no error so far.
-
-                    if(argument == "test")
-                    {
-                        antennaHandler.SendPositionUpdateRequest(1);
-
-                    }
-
 
                     var my_connected_connector = systemsAnalyzer.FindMyConnectedConnector();
                     //findConnectorCount += 1;
@@ -377,21 +383,45 @@ namespace IngameScript
                 if (timeElapsed >= timeLimit)
                 {
                     systemsAnalyzer.CheckForMassChange();
+
+                    if (hasConnectionToAntenna && enable_antenna_function)
+                    {
+                        antennaHandler.SendPositionUpdateRequest(1);
+                    }
+
                     // Do docking sequence:
                     DockingSequenceFrameUpdate();
                     timeElapsed = 0;
                 }
             }
-
-
-            if ((updateSource & UpdateType.IGC) > 0)
+            if (enable_antenna_function && scriptEnabled && !errorState && !hasConnectionToAntenna)
             {
-                
+                //We need to search for a docking script home antenna.
+                timeElapsedSinceAntennaCheck += Runtime.TimeSinceLastRun.TotalSeconds;
+                if (timeElapsedSinceAntennaCheck >= 1)
+                {
+                    antennaHandler.SendPositionUpdateRequest(1);
+                    timeElapsedSinceAntennaCheck = 0;
+                }
+            }
+
+
+            if ((updateSource & UpdateType.IGC) != 0 && enable_antenna_function)
+            {
+                //shipIOHandler.Clear();
+
                 // Has recieved a message
                 antennaHandler.HandleMessage();
-                shipIOHandler.EchoFinish();
+                //shipIOHandler.EchoFinish();
+                
             }
         }
+
+        //public void ScriptMain(string argum)
+        //{
+
+        //}
+
         HomeLocation FindHomeLocation(string argument)
         {
             int amountFound = 0;
@@ -465,14 +495,21 @@ namespace IngameScript
                         height_needed_for_connector = 6;
                         topSpeedUsed = topSpeed;
                     }
-                    if(topSpeedUsed > topSpeed)
+                    if (extra_soft_landing_mode)
+                    {
+                        height_needed_for_connector = 8;
+
+                    }
+
+                    if (topSpeedUsed > topSpeed)
                 {
                     topSpeedUsed = topSpeed;
                 }
 
+
                 Vector3D ConnectorLocation = systemsAnalyzer.currentHomeLocation.stationConnectorPosition;
                 Vector3D ConnectorDirection = systemsAnalyzer.currentHomeLocation.stationConnectorForward;
-                Vector3D ConnectorUp = systemsAnalyzer.currentHomeLocation.stationConnectorUp;
+                Vector3D ConnectorUp = systemsAnalyzer.currentHomeLocation.stationConnectorUpGlobal;
                 Vector3D target_position = ConnectorLocation + (ConnectorDirection * height_needed_for_connector);
                 Vector3D current_position = systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
 
@@ -572,6 +609,10 @@ namespace IngameScript
                                 {
                                     aboveConnectorWaypoint.maximumAcceleration = 1;
                                 }
+                                if (extra_soft_landing_mode)
+                                {
+                                    topSpeedUsed = 2;
+                                }
 
                             double acc = MoveToWaypoint(DockedToConnector);
                             point_in_sequence = "landing on connector";
@@ -623,17 +664,17 @@ namespace IngameScript
             var UnknownAcceleration = Vector3.Zero;
             var Gravity_And_Unknown_Forces = (systemsAnalyzer.cockpit.GetNaturalGravity() + UnknownAcceleration) * systemsAnalyzer.shipMass;
 
-            Vector3D TargetRoute = waypoint.position - systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
+            Vector3D TargetRoute = (waypoint.position + (systemsAnalyzer.currentHomeLocation.stationVelocity * DeltaTimeReal)) - systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
             Vector3D TargetDirection = Vector3D.Normalize(TargetRoute);
             double totalDistanceLeft = TargetRoute.Length();
 
             // Finding max forward thrust:
-            double LeadVelocity = (CurrentVelocity - platformVelocity).Length() + (DeltaTime * (waypoint.maximumAcceleration + issueDetection));
+            double LeadVelocity = (CurrentVelocity - systemsAnalyzer.currentHomeLocation.stationVelocity).Length() + (DeltaTime * (waypoint.maximumAcceleration + issueDetection));
             if (LeadVelocity > topSpeedUsed)
             {
                 LeadVelocity = topSpeedUsed;
             }
-            Vector3D TargetVelocity = (TargetDirection * LeadVelocity) + platformVelocity;
+            Vector3D TargetVelocity = (TargetDirection * LeadVelocity) + systemsAnalyzer.currentHomeLocation.stationVelocity;
             Vector3D velocityDifference = CurrentVelocity - TargetVelocity;
             double max_forward_acceleration;
             if (velocityDifference.Length() == 0)
@@ -653,7 +694,7 @@ namespace IngameScript
 
             }
             // Finding reverse thrust:
-            Vector3D reverse_target_velocity = platformVelocity;
+            Vector3D reverse_target_velocity = systemsAnalyzer.currentHomeLocation.stationVelocity;
             Vector3D reverse_velocity_difference = CurrentVelocity - reverse_target_velocity;
             double max_reverse_acceleration;
             if (reverse_velocity_difference.Length() == 0)
@@ -682,6 +723,7 @@ namespace IngameScript
                 timeToGetToZero = reverse_velocity_difference.Length() / (max_reverse_acceleration * (1 - caution) * waypoint.PercentageOfMaxAcceleration);
                 timeToGetToZero += DeltaTime;
                 distanceToGetToZero = (reverse_velocity_difference.Length() * timeToGetToZero) / 2;
+                
             }
             if (distanceToGetToZero + waypoint.required_accuracy < totalDistanceLeft)
             {
@@ -851,6 +893,7 @@ namespace IngameScript
             
             Runtime.UpdateFrequency |= UpdateFrequency.Update1;
             scriptEnabled = false;
+            runningIssues = "";
             if (systemsAnalyzer != null)
             {
                 foreach (IMyGyro thisGyro in systemsAnalyzer.gyros)
