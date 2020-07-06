@@ -25,6 +25,8 @@ namespace IngameScript
         {
             readonly Program parent_program;
             private string echoLine = "";
+            public List<IMyTimerBlock> output_timers = new List<IMyTimerBlock>();
+            public List<IMyTextSurface> output_LCDs = new List<IMyTextSurface>();
 
             public static double RoundToSignificantDigits(double d, int digits)
             {
@@ -38,7 +40,30 @@ namespace IngameScript
             public IOHandler(Program _parent_program)
             {
                 parent_program = _parent_program;
+                FindOutputBlocks();
             }
+
+            public void FindOutputBlocks()
+            {
+                output_timers = new List<IMyTimerBlock>();
+                output_LCDs = new List<IMyTextSurface>();
+                foreach (var block in parent_program.blocks)
+                {
+                    if (block is IMyTimerBlock && block.CustomName.ToLower().Contains("[dock]") && blockIsOnMyGrid(block))
+                    {
+                        output_timers.Add((IMyTimerBlock)block);
+                    }
+                    if (block is IMyTextSurface && block.CustomName.ToLower().Contains("[dock]") && blockIsOnMyGrid(block))
+                    {
+                        output_LCDs.Add((IMyTextSurface)block);
+                    }
+                }
+            }
+            public bool blockIsOnMyGrid(IMyTerminalBlock block)
+            {
+                return block.CubeGrid.EntityId == parent_program.Me.CubeGrid.EntityId;
+            }
+
             /// <summary>
             /// Provides an error to the user then sets error state to true.<br />
             /// This effectively stops the script entirely requiring it to be recompiled.
@@ -87,7 +112,22 @@ namespace IngameScript
                     return argument;
                 }
             }
-
+            public void OutputTimer()
+            {
+                if(output_timers.Count > 0)
+                {
+                    foreach (IMyTimerBlock timer in output_timers)
+                    {
+                        if(timer != null)
+                        {
+                            if (timer.IsWorking)
+                            {
+                                timer.Trigger();
+                            }
+                        }
+                    }
+                }
+            }
             /// <summary>
             /// This will output the accumulated Echo line to the user.<br />
             /// The bool parameter defines where the output will be:<br />
@@ -103,19 +143,24 @@ namespace IngameScript
                     {
                         parent_program.runningIssues += "\n";
                     }
-                    parent_program.Echo("= Spug's Auto Docking 2.0 =\n\n" + parent_program.runningIssues + echoLine);
-                    //if (!OnlyInProgrammingBlock)
-                    //{
-                    //    IMyTextSurface surface = parent_program.GridTerminalSystem.GetBlockWithName("LCD Panel") as IMyTextSurface;
-                    //    if (surface != null)
-                    //    {
-                    //        surface.ContentType = ContentType.TEXT_AND_IMAGE;
-                    //        surface.FontSize = fontSize;
-                    //        surface.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
-                    //        surface.WriteText(echoLine);
-                    //    }
-                        
-                    //}
+                    string echoString = "= Spug's Auto Docking 2.0 =\n\n" + parent_program.runningIssues + echoLine;
+                    parent_program.Echo(echoString);
+                    if (!OnlyInProgrammingBlock && output_LCDs.Count > 0)
+                    {
+                        foreach(IMyTextSurface surface in output_LCDs)
+                        {
+                            if (surface != null)
+                            {
+                                surface.ContentType = ContentType.TEXT_AND_IMAGE;
+                                //surface.FontSize = fontSize;
+                                //surface.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
+                                surface.WriteText(echoString);
+                            }
+                        }
+                        //IMyTextSurface surface = parent_program.GridTerminalSystem.GetBlockWithName("LCD Panel") as IMyTextSurface;
+
+
+                    }
                     echoLine = "";
                 }
             }

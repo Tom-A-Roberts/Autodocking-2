@@ -31,14 +31,16 @@ namespace IngameScript
 
             /// <summary>The main Cockpit of the ship, used to define mass, "Forwards" and other coordinate systems.</summary>
             public IMyShipController cockpit;
+            public IMyRemoteControl remote_control;
 
             //Current status variables:
             //public IMyShipConnector myConnector; // OUTDATED MUST CHANGE!
             public HomeLocation currentHomeLocation;
 
             public List<IMyThrust> thrusters = new List<IMyThrust>();
-            public List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
+            
             public List<IMyGyro> gyros = new List<IMyGyro>();
+
 
             /// <summary>Mass of the ship in Kilograms</summary>
             public float shipMass = 9999;
@@ -48,6 +50,8 @@ namespace IngameScript
 
             public bool basicDataGatherRequired = false;
 
+
+
             /// <summary>Directions are with respect to the cockpit.</summary>
             public ThrusterGroup ForwardThrust;
             public ThrusterGroup UpThrust;
@@ -56,6 +60,7 @@ namespace IngameScript
             public ThrusterGroup DownThrust;
             public ThrusterGroup RightThrust;
             public Dictionary<Base6Directions.Direction,ThrusterGroup> thrusterGroups;
+
 
 
             public ShipSystemsAnalyzer(Program in_parent_program)
@@ -174,7 +179,7 @@ namespace IngameScript
                 }
 
                 ThrusterGroup bestCandidate = null;
-                double bestCandidateLambda = -9999999;
+                double bestCandidateLambda = -999999999;
                 foreach (KeyValuePair<Base6Directions.Direction, ThrusterGroup> entry in thrusterGroups)
                 {
                     if (entry.Value.lambdaResult > bestCandidateLambda)
@@ -286,7 +291,8 @@ namespace IngameScript
             /// <summary>Gathers the blocks that relate to the ship. This includes:<br />The cockpit, thrusters, gyros, (main) connector.</summary>
             public void GatherBasicData()
             {
-                parent_program.GridTerminalSystem.GetBlocks(blocks);
+                
+
                 if (!firstTime && !parent_program.scriptEnabled)
                 {
                     parent_program.shipIOHandler.Echo("RE-INITIALIZED\nSome change was detected\nso I have re-checked ship data, " + parent_program.your_title + ".");
@@ -316,6 +322,9 @@ namespace IngameScript
                 //myConnector = FindConnector();
                 thrusters = FindThrusters();
                 gyros = FindGyros();
+
+                
+
                 string antenna_result = "";
                 if (parent_program.enable_antenna_function)
                 {
@@ -379,7 +388,7 @@ namespace IngameScript
             {
                 List<IMyThrust> o_thrusters = new List<IMyThrust>();
 
-                foreach (var block in blocks)
+                foreach (var block in parent_program.blocks)
                 {
                     if (block is IMyThrust && block.IsWorking && blockIsOnMyGrid(block))
                     {
@@ -392,7 +401,7 @@ namespace IngameScript
             List<IMyGyro> FindGyros()
             {
                 List<IMyGyro> o_gyros = new List<IMyGyro>();
-                foreach (var block in blocks)
+                foreach (var block in parent_program.blocks)
                 {
                     if (block is IMyGyro && block.IsWorking && blockIsOnMyGrid(block))
                     {
@@ -439,6 +448,8 @@ namespace IngameScript
                 return output;
             }
 
+
+
             public void CheckForMassChange()
             {
                 var Masses =cockpit.CalculateShipMass();
@@ -457,7 +468,7 @@ namespace IngameScript
                 bool foundMainCockpit = false;
                 
                 
-                foreach (var block in blocks)
+                foreach (var block in parent_program.blocks)
                 {
                     if (block is IMyShipController && blockIsOnMyGrid(block))
                     {
@@ -483,33 +494,13 @@ namespace IngameScript
                         {
                             foundCockpit = (IMyShipController)block;
                         }
+                        if(block is IMyRemoteControl && remote_control == null)
+                        {
+                            remote_control = (IMyRemoteControl)block;
+                        }
                     }
                 }
                 return foundCockpit;
-            }
-            IMyShipConnector FindConnector()
-            {
-
-                IMyShipConnector foundConnector = null;
-                foreach (var block in blocks)
-                {
-                    if (block is IMyShipConnector && blockIsOnMyGrid(block))
-                    {
-                        if (foundConnector == null)
-                        {
-                            foundConnector = (IMyShipConnector)block;
-                        }
-                        if (block.CustomName.ToLower().Contains("[dock]") == true)
-                        {
-                            foundConnector = (IMyShipConnector)block;
-                        }
-                    }
-                }
-                if (foundConnector == null)
-                {
-                    Error("I couldn't find a connector on this ship, Your Highness.");
-                }
-                return foundConnector;
             }
 
             public void Populate6ThrusterGroups()
@@ -637,35 +628,6 @@ namespace IngameScript
             }
             #endregion
 
-            #region Debug
-
-            public double CheckAccelerationFromThrusters(ThrusterGroup thrusterGroupToUse, Vector3D gravity_and_unknown)
-            {
-                Vector3D totalThrusterForce = Vector3D.Zero;
-                
-                totalThrusterForce += Vector3D.Normalize(thrusterGroupToUse.finalThrusterGroups[0].WorldThrustDirection) * thrusterGroupToUse.finalThrustForces.X;
-                totalThrusterForce += Vector3D.Normalize(thrusterGroupToUse.finalThrusterGroups[1].WorldThrustDirection) * thrusterGroupToUse.finalThrustForces.Y;
-                totalThrusterForce += Vector3D.Normalize(thrusterGroupToUse.finalThrusterGroups[2].WorldThrustDirection) * thrusterGroupToUse.finalThrustForces.Z;
-                if (thrusterGroupToUse.finalThrustForces.X > thrusterGroupToUse.finalThrusterGroups[0].MaxThrust)
-                {
-                    Echo(thrusterGroupToUse.finalThrusterGroups[0].LocalThrustDirection.ToString() + " has not enough force: " + IOHandler.RoundToSignificantDigits(thrusterGroupToUse.finalThrustForces.X / thrusterGroupToUse.finalThrusterGroups[0].MaxThrust, 3).ToString());
-                }
-                if (thrusterGroupToUse.finalThrustForces.Y > thrusterGroupToUse.finalThrusterGroups[1].MaxThrust)
-                {
-                    Echo(thrusterGroupToUse.finalThrusterGroups[1].LocalThrustDirection.ToString() + " has not enough force: " + IOHandler.RoundToSignificantDigits(thrusterGroupToUse.finalThrustForces.Y / thrusterGroupToUse.finalThrusterGroups[1].MaxThrust, 3).ToString());
-                }
-                if (thrusterGroupToUse.finalThrustForces.Z > thrusterGroupToUse.finalThrusterGroups[2].MaxThrust)
-                {
-                    Echo(thrusterGroupToUse.finalThrusterGroups[2].LocalThrustDirection.ToString() + " has not enough force: " + IOHandler.RoundToSignificantDigits(thrusterGroupToUse.finalThrustForces.Z / thrusterGroupToUse.finalThrusterGroups[2].MaxThrust, 3).ToString());
-                }
-
-                Vector3D resultantNoGravT = totalThrusterForce + gravity_and_unknown;
-
-                return resultantNoGravT.Length() / shipMass;
-            }
-
-            #endregion
-
         }
 
         public class ThrusterGroup
@@ -728,28 +690,5 @@ namespace IngameScript
 
         }
 
-        public class ThrusterGroupResult
-        {
-            public Vector3D finalThrustForces;
-            public ThrusterGroup[] finalThrusterGroups;
-            public double lambdaResult;
-
-            public ThrusterGroupResult(ThrusterGroup group_to_copy)
-            {
-                finalThrustForces.X = group_to_copy.finalThrustForces.X;
-                finalThrustForces.Y = group_to_copy.finalThrustForces.Y;
-                finalThrustForces.Z = group_to_copy.finalThrustForces.Z;
-
-                finalThrusterGroups = new ThrusterGroup[6];
-                finalThrusterGroups[0] = group_to_copy.finalThrusterGroups[0];
-                finalThrusterGroups[1] = group_to_copy.finalThrusterGroups[1];
-                finalThrusterGroups[2] = group_to_copy.finalThrusterGroups[2];
-                finalThrusterGroups[3] = group_to_copy.finalThrusterGroups[3];
-                finalThrusterGroups[4] = group_to_copy.finalThrusterGroups[4];
-                finalThrusterGroups[5] = group_to_copy.finalThrusterGroups[5];
-                finalThrusterGroups[6] = group_to_copy.finalThrusterGroups[6];
-                lambdaResult = group_to_copy.lambdaResult;
-            }
-        }
     }
 }
