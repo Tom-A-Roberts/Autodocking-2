@@ -25,10 +25,12 @@ namespace IngameScript
         string your_title = "Captain";                                  // How the ship will refer to you.
         bool small_ship_rotate_on_connector = true;       //If enabled, small ships will rotate on the connector to face the saved direction.
         bool large_ship_rotate_on_connector = false;      //If enabled, large ships will rotate on the connector to face the saved direction.
+        bool rotate_on_approach = false;                          //If enabled,  the ship will rotate to the saved direction on connector approach.
         double topSpeed = 100;                                         // The top speed the ship will go in m/s.
         bool extra_soft_landing_mode = false;                 // If your ship is hitting your connector too hard, enable this.
+        double connector_clearance = 0;                          // If you raise this number (measured in meters), the ship will fly up higher before coming down onto the connector.
 
-        bool enable_antenna_function = true;                  //If enabled, the ship will try to search for an optional home script. Disable if the antenna functionality is giving you problems.
+        bool enable_antenna_function = true;                   //If enabled, the ship will try to search for an optional home script. Disable if the antenna functionality is giving you problems.
 
 
         // DO NOT CHANGE BELOW THIS LINE \/ \/ \/
@@ -50,6 +52,7 @@ namespace IngameScript
         double timeElapsed = 0;
         double timeElapsedSinceAntennaCheck = 0;
         bool hasConnectionToAntenna = false;
+        bool lastUpdateWasApproach = false;
         DateTime scriptStartTime;
         List<HomeLocation> homeLocations;
 
@@ -231,6 +234,7 @@ namespace IngameScript
                 current_argument = argument;
                 scriptEnabled = true;
                 hasConnectionToAntenna = false;
+                lastUpdateWasApproach = false;
                 runningIssues = "";
                 safetyAcceleration = 1;
                 Runtime.UpdateFrequency = UpdateFrequency.Update1;
@@ -457,7 +461,6 @@ namespace IngameScript
             return resultantHomeLocation;
         }
 
-
         void DockingSequenceFrameUpdate()
         {
             bool dontRotateOnConnector = ((!small_ship_rotate_on_connector && !systemsAnalyzer.isLargeShip) || (!large_ship_rotate_on_connector && systemsAnalyzer.isLargeShip));
@@ -509,6 +512,7 @@ namespace IngameScript
                         height_needed_for_connector = 8;
 
                     }
+                    height_needed_for_connector += connector_clearance;
 
                     if (topSpeedUsed > topSpeed)
                 {
@@ -550,8 +554,14 @@ namespace IngameScript
                 }
                 else
                 {
-                    direction_accuracy = AlignWithGravity(aboveConnectorWaypoint, false);
+                        bool yaw_rotate = false;
+                        if (rotate_on_approach && lastUpdateWasApproach)
+                        {
+                            yaw_rotate = true;
+                        }
+                    direction_accuracy = AlignWithGravity(aboveConnectorWaypoint, yaw_rotate);
                 }
+                lastUpdateWasApproach = false;
                 if (!connectedLate)
                 {
 
@@ -634,6 +644,7 @@ namespace IngameScript
 
                             double acc = MoveToWaypoint(DockedToConnector);
                             point_in_sequence = "landing on connector";
+                            lastUpdateWasApproach = true;
                         }
                     }
                     else

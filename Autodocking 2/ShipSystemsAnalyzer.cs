@@ -422,7 +422,8 @@ namespace IngameScript
                 bool found_connectable_connector = false;
                 foreach (var connector in Connectors)
                 {
-                    if (cockpit.CubeGrid.ToString() == connector.CubeGrid.ToString())
+                    
+                    if (cockpit.CubeGrid.ToString() == connector.CubeGrid.ToString() && !connector.CustomName.ToLower().Contains("[recall dock]"))
                     {
                         if (connector.Status == MyShipConnectorStatus.Connected)
                         {
