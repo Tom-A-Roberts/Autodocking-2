@@ -9,7 +9,7 @@
       <Enabled>no</Enabled>
     </MDKTrimTypes>
     <MDKMinify>
-      <Level>StripComments</Level>
+      <Level>Full</Level>
     </MDKMinify>
     <MDKIgnore>
       <Folder>mdk</Folder>

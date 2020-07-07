@@ -1,46 +1,34 @@
-﻿using Sandbox.Game.EntityComponents;
-using Sandbox.ModAPI.Ingame;
-using Sandbox.ModAPI.Interfaces;
-using SpaceEngineers.Game.ModAPI.Ingame;
+﻿using System;
 using System.Collections.Generic;
-using System.Collections;
-using System.Linq;
-using System.Text;
-using System;
-using VRage.Collections;
-using VRage.Game.Components;
+using Sandbox.ModAPI.Ingame;
+using SpaceEngineers.Game.ModAPI.Ingame;
 using VRage.Game.GUI.TextPanel;
-using VRage.Game.ModAPI.Ingame.Utilities;
-using VRage.Game.ModAPI.Ingame;
-using VRage.Game.ObjectBuilders.Definitions;
-using VRage.Game;
-using VRage;
 using VRageMath;
 
 namespace IngameScript
 {
-    partial class Program
+    internal partial class Program
     {
         public class IOHandler
         {
-            readonly Program parent_program;
+            private readonly Program parent_program;
             private string echoLine = "";
-            public List<IMyTimerBlock> output_timers = new List<IMyTimerBlock>();
             public List<IMyTextSurface> output_LCDs = new List<IMyTextSurface>();
+            public List<IMyTimerBlock> output_timers = new List<IMyTimerBlock>();
+
+            public IOHandler(Program _parent_program)
+            {
+                parent_program = _parent_program;
+                FindOutputBlocks();
+            }
 
             public static double RoundToSignificantDigits(double d, int digits)
             {
                 if (d == 0)
                     return 0;
 
-                double scale = Math.Pow(10, Math.Floor(Math.Log10(Math.Abs(d))) + 1);
+                var scale = Math.Pow(10, Math.Floor(Math.Log10(Math.Abs(d))) + 1);
                 return scale * Math.Round(d / scale, digits);
-            }
-
-            public IOHandler(Program _parent_program)
-            {
-                parent_program = _parent_program;
-                FindOutputBlocks();
             }
 
             public void FindOutputBlocks()
@@ -49,106 +37,86 @@ namespace IngameScript
                 output_LCDs = new List<IMyTextSurface>();
                 foreach (var block in parent_program.blocks)
                 {
-                    if (block is IMyTimerBlock && block.CustomName.ToLower().Contains("[dock]") && blockIsOnMyGrid(block))
-                    {
-                        output_timers.Add((IMyTimerBlock)block);
-                    }
-                    if (block is IMyTextSurface && block.CustomName.ToLower().Contains("[dock]") && blockIsOnMyGrid(block))
-                    {
-                        output_LCDs.Add((IMyTextSurface)block);
-                    }
+                    if (block is IMyTimerBlock && block.CustomName.ToLower().Contains("[dock]") &&
+                        blockIsOnMyGrid(block)) output_timers.Add((IMyTimerBlock) block);
+                    if (block is IMyTextSurface && block.CustomName.ToLower().Contains("[dock]") &&
+                        blockIsOnMyGrid(block)) output_LCDs.Add((IMyTextSurface) block);
                 }
             }
+
             public bool blockIsOnMyGrid(IMyTerminalBlock block)
             {
                 return block.CubeGrid.EntityId == parent_program.Me.CubeGrid.EntityId;
             }
 
             /// <summary>
-            /// Provides an error to the user then sets error state to true.<br />
-            /// This effectively stops the script entirely requiring it to be recompiled.
+            ///     Provides an error to the user then sets error state to true.<br />
+            ///     This effectively stops the script entirely requiring it to be recompiled.
             /// </summary>
             /// <param name="ErrorString">The error published to the user.</param>
             public void Error(string ErrorString)
             {
-                if (!parent_program.errorState)
-                {
-                    echoLine = "";
-                }
+                if (!parent_program.errorState) echoLine = "";
                 Echo("ERROR:\n" + ErrorString);
                 parent_program.errorState = true;
                 parent_program.SafelyExit();
-                EchoFinish(false);
+                EchoFinish();
             }
 
             public void WritePastableCoords(Vector3D coords, string coord_name = "0")
             {
                 //GPS:Spug #1:53571.5:-26605.41:12103.89:
-                Echo("GPS:" + coord_name + ":" + coords.X.ToString() + ":" + coords.Y.ToString() + ":" + coords.Z.ToString() + ":");
+                Echo("GPS:" + coord_name + ":" + coords.X + ":" + coords.Y + ":" + coords.Z + ":");
             }
 
 
             /// <summary>
-            /// Adds the input string (or object) to an accumulated line.<br />
-            /// Use EchoFinish to output this accumulated line to the user.
+            ///     Adds the input string (or object) to an accumulated line.<br />
+            ///     Use EchoFinish to output this accumulated line to the user.
             /// </summary>
             /// <param name="inp">Some object. This function applies .ToString() to it.</param>
             public void Clear()
             {
                 echoLine = "";
             }
-            public void Echo(Object inp)
+
+            public void Echo(object inp)
             {
-                echoLine += inp.ToString() + "\n";
+                echoLine += inp + "\n";
             }
+
             public static string ConvertArg(string argument)
             {
-                if(argument == "")
-                {
+                if (argument == "")
                     return "no argument";
-                }
-                else
-                {
-                    return argument;
-                }
+                return argument;
             }
+
             public void OutputTimer()
             {
-                if(output_timers.Count > 0)
-                {
-                    foreach (IMyTimerBlock timer in output_timers)
-                    {
-                        if(timer != null)
-                        {
+                if (output_timers.Count > 0)
+                    foreach (var timer in output_timers)
+                        if (timer != null)
                             if (timer.IsWorking)
-                            {
                                 timer.Trigger();
-                            }
-                        }
-                    }
-                }
             }
+
             /// <summary>
-            /// This will output the accumulated Echo line to the user.<br />
-            /// The bool parameter defines where the output will be:<br />
-            /// True - Only output into the programming block.<br />
-            /// False (default) - Output to both the programming block and an LCD with the name "LCD Panel".
+            ///     This will output the accumulated Echo line to the user.<br />
+            ///     The bool parameter defines where the output will be:<br />
+            ///     True - Only output into the programming block.<br />
+            ///     False (default) - Output to both the programming block and an LCD with the name "LCD Panel".
             /// </summary>
             /// <param name="OnlyInProgrammingBlock">Defines where the output will be shown</param>
             public void EchoFinish(bool OnlyInProgrammingBlock = false, float fontSize = 1)
             {
                 if (echoLine != "")
                 {
-                    if(parent_program.runningIssues.Length > 0)
-                    {
-                        parent_program.runningIssues += "\n";
-                    }
-                    string echoString = "= Spug's Auto Docking 2.0 =\n\n" + parent_program.runningIssues + echoLine;
+                    if (parent_program.runningIssues.Length > 0) parent_program.runningIssues += "\n";
+                    var echoString = "= Spug's Auto Docking 2.0 =\n\n" + parent_program.runningIssues + echoLine;
                     parent_program.Echo(echoString);
                     if (!OnlyInProgrammingBlock && output_LCDs.Count > 0)
-                    {
-                        foreach(IMyTextSurface surface in output_LCDs)
-                        {
+                        foreach (var surface in output_LCDs)
                             if (surface != null)
                             {
                                 surface.ContentType = ContentType.TEXT_AND_IMAGE;
@@ -156,11 +124,8 @@ namespace IngameScript
                                 //surface.Alignment = VRage.Game.GUI.TextPanel.TextAlignment.LEFT;
                                 surface.WriteText(echoString);
                             }
-                        }
-                        //IMyTextSurface surface = parent_program.GridTerminalSystem.GetBlockWithName("LCD Panel") as IMyTextSurface;
+                    //IMyTextSurface surface = parent_program.GridTerminalSystem.GetBlockWithName("LCD Panel") as IMyTextSurface;
 
-
-                    }
                     echoLine = "";
                 }
             }
@@ -169,50 +134,43 @@ namespace IngameScript
             public void OutputHomeLocations()
             {
                 Echo("Known docking locations:");
-                int count = 1;
-                foreach (HomeLocation currentHomeLocation in parent_program.homeLocations)
+                var count = 1;
+                foreach (var currentHomeLocation in parent_program.homeLocations)
                 {
                     //Echo("Station connector: " + currentHomeLocation.stationConnectorName);
                     //IMyShipConnector my_connector = (IMyShipConnector)parent_program.GridTerminalSystem.GetBlockWithId(currentHomeLocation.shipConnectorID);
                     //Echo("Ship connector: " + my_connector.CustomName);
 
-                    string argStr = "- Location " + count.ToString() + " arguments: ";
-                    foreach (string arg in currentHomeLocation.arguments)
+                    var argStr = "- Location " + count + " arguments: ";
+                    foreach (var arg in currentHomeLocation.arguments)
                     {
-                        string arg_r = arg;
-                        if(arg == "")
-                        {
-                            arg_r = "NO ARG";
-                        }
+                        var arg_r = arg;
+                        if (arg == "") arg_r = "NO ARG";
                         argStr += arg_r + ", ";
-
                     }
+
                     Echo(argStr.Substring(0, argStr.Length - 2));
                     count += 1;
                 }
             }
+
             public string GetHomeLocationArguments(HomeLocation currentHomeLocation)
             {
                 //Echo("\n   Home location Data:");
                 //    Echo("Station connector: " + currentHomeLocation.stationConnectorName);
                 //    IMyShipConnector my_connector = (IMyShipConnector)parent_program.GridTerminalSystem.GetBlockWithId(currentHomeLocation.shipConnectorID);
                 //    Echo("Ship connector: " + my_connector.CustomName);
-                string argStr = "";// "Other arguments for this location: ";
-                
-                    foreach (string arg in currentHomeLocation.arguments)
-                    {
-                        string arg_r = arg;
-                        if (arg == "")
-                        {
-                            arg_r = "NO ARG";
-                        }
-                        argStr += arg_r + ", ";
-                    }
-                    if (argStr.Length > 2)
+                var argStr = ""; // "Other arguments for this location: ";
+
+                foreach (var arg in currentHomeLocation.arguments)
                 {
-                    argStr = argStr.Substring(0, argStr.Length - 2);
+                    var arg_r = arg;
+                    if (arg == "") arg_r = "NO ARG";
+                    argStr += arg_r + ", ";
                 }
-                    return argStr;
+
+                if (argStr.Length > 2) argStr = argStr.Substring(0, argStr.Length - 2);
+                return argStr;
             }
 
             public void DockingSequenceStartMessage(string argument)
@@ -230,18 +188,12 @@ namespace IngameScript
                 //}
                 //else
                 //{
-                    if (argument == "")
-                    {
-                        Echo("RUNNING\nAttempting docking sequence\nwith no argument.");
-                    }
-                    else
-                    {
-                        Echo("RUNNING\nAttempting docking sequence\nwith argument: " + argument);
-                    }
+                if (argument == "")
+                    Echo("RUNNING\nAttempting docking sequence\nwith no argument.");
+                else
+                    Echo("RUNNING\nAttempting docking sequence\nwith argument: " + argument);
                 //}
-
             }
-
         }
     }
 }
