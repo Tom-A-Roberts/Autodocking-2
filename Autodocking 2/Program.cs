@@ -13,27 +13,40 @@ namespace IngameScript
 
         // CHANGEABLE VARIABLES:
 
-        int speedSetting = 2;                       // 1 = Cinematic, 2 = Classic, 3 = Breakneck
+        int speedSetting = 2;                           // 1 = Cinematic, 2 = Classic, 3 = Breakneck
                                                                      // Cinematic: Slower but looks cooler, especially for larger ships.
                                                                      // Classic: Lands at the classic pace.
                                                                      // Breakneck: Still safe, but will land pretty much as quick as it can.
-        double caution = 0.4;                                   // Between 0 - 0.9. Defines how close to max deceleration the ship will ride.
-        bool extra_info = false;                                           // If true, this script will give you more information about what's happening than usual.
+        
+
+        double caution = 0.4;                                             // Between 0 - 0.9. Defines how close to max deceleration the ship will ride.
+        bool extra_info = false;                                          // If true, this script will give you more information about what's happening than usual.
         string your_title = "Captain";                                  // How the ship will refer to you.
         bool small_ship_rotate_on_connector = true;       //If enabled, small ships will rotate on the connector to face the saved direction.
         bool large_ship_rotate_on_connector = false;      //If enabled, large ships will rotate on the connector to face the saved direction.
         bool rotate_on_approach = false;                          //If enabled,  the ship will rotate to the saved direction on connector approach.
         double topSpeed = 100;                                         // The top speed the ship will go in m/s.
+
         bool extra_soft_landing_mode = false;                 // If your ship is hitting your connector too hard, enable this.
         double connector_clearance = 0;                          // If you raise this number (measured in meters), the ship will fly up higher before coming down onto the connector.
 
         bool enable_antenna_function = true;                   //If enabled, the ship will try to search for an optional home script. Disable if the antenna functionality is giving you problems.
 
 
+        // Waypoint settings:
+        double required_waypoint_accuracy = 0.2;              // how close the ship needs to be to a waypoint to complete it (measured in meters).
+
+
+
+        // This code has been minified by Malware's MDK minifier.
+        // Find the original source code here:
+        // https://github.com/ksqk34/Autodocking-2
+
+
 
 
         // DO NOT CHANGE BELOW THIS LINE
-        //
+        // Well you can try...
         private readonly ShipSystemsAnalyzer systemsAnalyzer;
         #endregion
         private const double updatesPerSecond = 10; // Defines how many times the script performes it's calculations per second.
@@ -80,6 +93,7 @@ namespace IngameScript
         private double safetyAcceleration = 1;
         private bool scriptEnabled;
         private DateTime scriptStartTime;
+        private int current_waypoint_number = 0;
 
         private string status = "";
 
@@ -122,7 +136,11 @@ namespace IngameScript
         private void RetrieveStorage()
         {
             //Data 
+
             var two_halves = Storage.Split('#');
+            //if (copy_paste_persistant_memory)
+            //    two_halves = Me.CustomData.Split('#');
+
             var home_location_data = two_halves[0].Split(';');
 
             foreach (var dataItem in home_location_data)
@@ -208,9 +226,25 @@ namespace IngameScript
         public void Save()
         {
             Storage = "";
+            //if (copy_paste_persistant_memory)
+            //    Me.CustomData = "";
             //Data 
-            foreach (var homeLocation in homeLocations) Storage += homeLocation.ProduceSaveData() + ";";
-            Storage += "#";
+            foreach (var homeLocation in homeLocations)
+            {
+                AppendToStorage(homeLocation.ProduceSaveData() + ";");
+                //Storage += homeLocation.ProduceSaveData() + ";";
+                //if (copy_paste_persistant_memory)
+                //    Me.CustomData += homeLocation.ProduceSaveData() + ";";
+            }
+            //Storage += "#";
+            AppendToStorage("#");
+        }
+
+        public void AppendToStorage(string data)
+        {
+            Storage += data;
+            //if (copy_paste_persistant_memory)
+            //    Me.CustomData += data;
         }
 
         /// <summary>Begins the ship docking sequence. Requires (Will require) a HomeLocation and argument.</summary>
@@ -228,6 +262,7 @@ namespace IngameScript
                 scriptEnabled = true;
                 hasConnectionToAntenna = false;
                 lastUpdateWasApproach = false;
+                current_waypoint_number = 0;
                 runningIssues = "";
                 safetyAcceleration = 1;
                 Runtime.UpdateFrequency = UpdateFrequency.Update1;
@@ -435,7 +470,51 @@ namespace IngameScript
             return resultantHomeLocation;
         }
 
+        /// <summary>Equivalent to "Update()" from Unity but specifically for the docking sequence.</summary>
         private void DockingSequenceFrameUpdate()
+        {
+            if (systemsAnalyzer.currentHomeLocation.landingSequences.ContainsKey(current_argument))
+            {
+                List<Waypoint> landing_sequence =
+                    systemsAnalyzer.currentHomeLocation.landingSequences[current_argument];
+
+                if (current_waypoint_number >= landing_sequence.Count)
+                {
+                    // We have completed all waypoints so land straight to the connector.
+                    AutoLandToConnector(true);
+                }
+                else
+                {
+                    // There are waypoints left to complete
+
+                    Waypoint currentWaypoint = landing_sequence[current_waypoint_number];
+                    Waypoint nextWaypoint = null;
+                    if (current_waypoint_number < landing_sequence.Count - 1)
+                    {
+                        nextWaypoint = landing_sequence[current_waypoint_number + 1];
+                    }
+                    double dist_to_waypoint = AutoFollowWaypoint(currentWaypoint, nextWaypoint);
+
+                    if (dist_to_waypoint < required_waypoint_accuracy)
+                    {
+                        // We've reached the latest waypoint.
+                        current_waypoint_number += 1;
+                    }
+
+                }
+            }
+            else
+            {
+                // There are no waypoints for this location.
+                AutoLandToConnector(false);
+            }
+        }
+
+        /// <summary>
+        /// Let the ship plot the waypoints to the connector. This occurres when there are no preset waypoints.
+        /// </summary>
+        /// <param name="only_last_landing">If true, the ship will simply land straight to the connector, not plot a path first.</param>
+        private void AutoLandToConnector(bool only_last_landing)
         {
             var dontRotateOnConnector = !small_ship_rotate_on_connector && !systemsAnalyzer.isLargeShip ||
                                         !large_ship_rotate_on_connector && systemsAnalyzer.isLargeShip;
@@ -481,9 +560,10 @@ namespace IngameScript
                         height_needed_for_connector = 6;
                         topSpeedUsed = topSpeed;
                     }
-
                     if (extra_soft_landing_mode) height_needed_for_connector = 8;
                     height_needed_for_connector += connector_clearance;
+
+                    if (only_last_landing) height_needed_for_connector = 0;
 
                     if (topSpeedUsed > topSpeed) topSpeedUsed = topSpeed;
                     if (systemsAnalyzer.currentHomeLocation.stationVelocity.Length() > 5)
@@ -507,6 +587,7 @@ namespace IngameScript
                     //shipIOHandler.Echo("acc: " + systemsAnalyzer.currentHomeLocation.stationAcceleration.ToString());
 
                     var point_in_sequence = "Starting...";
+
 
 
                     var aboveConnectorWaypoint = new Waypoint(target_position, ConnectorDirection, ConnectorUp);
@@ -536,6 +617,7 @@ namespace IngameScript
                     {
                         if (Math.Abs(direction_accuracy) < 15)
                         {
+
                             // Test if ship is behind the station connector:
                             var pointOnConnectorAxis = PID.NearestPointOnLine(ConnectorLocation, ConnectorDirection,
                                 current_position);
@@ -547,7 +629,7 @@ namespace IngameScript
 
 
                             if (sidewaysDistance > sideways_dist_needed_to_land && signedHeightDistanceToConnector <
-                                height_needed_for_connector * 0.9)
+                                height_needed_for_connector * 0.9 && !only_last_landing)
                             {
                                 // The ship is behind the connector, so it needs to fly up to it so that it is on the correct side at least.
                                 // Only then can it attempt to land.
@@ -571,7 +653,7 @@ namespace IngameScript
                                 MoveToWaypoint(SomewhereOnCorrectSide);
                                 point_in_sequence = "Behind target, moving to be in front";
                             }
-                            else if (sidewaysDistance > sideways_dist_needed_to_land)
+                            else if (sidewaysDistance > sideways_dist_needed_to_land && !only_last_landing)
                             {
                                 if (speedSetting == 1)
                                     aboveConnectorWaypoint.maximumAcceleration = 5;
@@ -628,7 +710,80 @@ namespace IngameScript
             }
         }
 
-        /// <summary>Equivalent to "Update()" from Unity but specifically for the docking sequence.</summary>
+
+
+        private double AutoFollowWaypoint(Waypoint currentWaypoint, Waypoint nextWaypoint)
+        {
+            shipIOHandler.DockingSequenceStartMessage(current_argument);
+
+            if (systemsAnalyzer.basicDataGatherRequired)
+            {
+                systemsAnalyzer.GatherBasicData();
+                systemsAnalyzer.basicDataGatherRequired = false;
+            }
+
+            if (errorState == true) return 0;
+
+            #region MotionSettings
+
+            // Motion settings
+
+            
+            if (speedSetting == 1)
+            {
+                topSpeedUsed = 10;
+            }
+            else if (speedSetting == 3)
+            {
+                topSpeedUsed = topSpeed;
+            }
+            else
+            {
+                topSpeedUsed = topSpeed;
+            }
+            if (topSpeedUsed > topSpeed) topSpeedUsed = topSpeed;
+            #endregion
+
+
+            var speedDampener = 1 - systemsAnalyzer.currentHomeLocation.stationVelocity.Length() / 100 * 0.2;
+            var WaypointLocation = systemsAnalyzer.currentHomeLocation.stationConnectorPosition +
+                                    DeltaTimeReal * systemsAnalyzer.currentHomeLocation.stationVelocity *
+                                    speedDampener;
+            var current_position = systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
+
+
+            var point_in_sequence = "Starting...";
+
+            // Constantly ensure alignment
+            double direction_accuracy = AlignWithGravity(currentWaypoint, true);
+
+            if (speedSetting == 1)
+                currentWaypoint.maximumAcceleration = 5;
+            else if (speedSetting == 3)
+                currentWaypoint.maximumAcceleration = 15;
+            else
+                currentWaypoint.maximumAcceleration = 5;
+
+            MoveToWaypoint(currentWaypoint);
+            point_in_sequence = "Waypoint " + current_waypoint_number.ToString() + ".";
+                            
+            if (extra_info)
+            {
+                shipIOHandler.Echo("Status: " + status);
+                shipIOHandler.Echo("Place in sequence: " + point_in_sequence);
+            }
+
+            var elapsed = DateTime.Now - scriptStartTime;
+            shipIOHandler.Echo("\nTime elapsed: " + elapsed.Seconds + "." + 
+                                elapsed.Milliseconds.ToString().Substring(0, 1));
+            shipIOHandler.EchoFinish();
+
+            return (current_position - WaypointLocation).Length();
+        }
+
+
+
+
         private double MoveToWaypoint(Waypoint waypoint)
         {
             //bool tempError = false;
@@ -657,7 +812,15 @@ namespace IngameScript
             var Gravity_And_Unknown_Forces = (systemsAnalyzer.cockpit.GetNaturalGravity() + UnknownAcceleration) *
                                              systemsAnalyzer.shipMass;
             // + (systemsAnalyzer.currentHomeLocation.stationVelocity * DeltaTimeReal))
-            var TargetRoute = waypoint.position - systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
+
+            Vector3D waypointPos = waypoint.position;
+
+            if (waypoint.WaypointIsLocal)
+            {
+                waypointPos = HomeLocation.localPositionToWorldPosition(waypointPos, systemsAnalyzer.currentHomeLocation);
+            }
+
+            var TargetRoute = waypointPos - systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
             var TargetDirection = Vector3D.Normalize(TargetRoute);
             var totalDistanceLeft = TargetRoute.Length();
 

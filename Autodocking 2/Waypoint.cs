@@ -6,6 +6,9 @@ namespace IngameScript
     {
         public class Waypoint
         {
+            /// <summary>
+            /// Forward as if it's a connector. = docking target connector.forward
+            /// </summary>
             public Vector3D forward;
 
             /// <summary>
@@ -20,9 +23,21 @@ namespace IngameScript
             /// </summary>
             public double PercentageOfMaxAcceleration = 1;
 
+            /// <summary>
+            /// The location of the waypoint in global space
+            /// </summary>
             public Vector3D position;
+
+            /// <summary>
+            /// The location of the waypoint in global space
+            /// </summary>
             public double required_accuracy = 0.1;
             public bool RequireRotation = true;
+            public bool WaypointIsLocal = false;
+
+            /// <summary>
+            /// The "up" rotation of the docking connector, as if it's a 
+            /// </summary>
             public Vector3D up;
 
 

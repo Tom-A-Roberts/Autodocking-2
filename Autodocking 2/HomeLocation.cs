@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Xml.Serialization;
 using Sandbox.ModAPI.Ingame;
 using VRageMath;
 
@@ -15,7 +16,10 @@ namespace IngameScript
         {
             private const char main_delimeter = '¬';
             private const char arg_delimeter = '`';
+            
             public HashSet<string> arguments = new HashSet<string>();
+
+
             public IMyShipConnector shipConnector;
             public long shipConnectorID; // myConnector.EntityId;
             public Vector3D stationAcceleration = Vector3D.Zero;
@@ -40,6 +44,75 @@ namespace IngameScript
 
             public Vector3D stationVelocity = Vector3D.Zero;
 
+            private const char landing_sequence_delimeter = 'ç';
+            private const char waypoint_delimeter = 'å';
+            private const char waypoint_data_delimeter = 'ã';
+
+            public Dictionary<string, List<Waypoint>> landingSequences = new Dictionary<string, List<Waypoint>>();
+
+
+            public void landingSequencesFromString(string data)
+            {
+                landingSequences = new Dictionary<string, List<Waypoint>>();
+                if (data != "")
+                {
+                    string[] split_landing_sequences = data.Split(landing_sequence_delimeter);
+
+                    foreach (string landingSequenceStr in split_landing_sequences)
+                    {
+                        if (landingSequenceStr != "")
+                        {
+                            string[] split_into_waypoints = landingSequenceStr.Split(waypoint_delimeter);
+                            if (split_into_waypoints.Length > 1)
+                            {
+                                string current_arg = split_into_waypoints[0];
+                                List<Waypoint> currentLandingSequence = new List<Waypoint>();
+                                for (int i = 1; i < split_into_waypoints.Length; i++)
+                                {
+                                    if (split_into_waypoints[i] != "")
+                                    {
+                                        string[] waypoint_data = split_into_waypoints[i].Split(waypoint_data_delimeter);
+                                        Vector3D pos = new Vector3D();
+                                        Vector3D forward = new Vector3D();
+                                        Vector3D up = new Vector3D();
+                                        Vector3D.TryParse(waypoint_data[0], out pos);
+                                        Vector3D.TryParse(waypoint_data[1], out forward);
+                                        Vector3D.TryParse(waypoint_data[2], out up);
+                                        Waypoint newWaypoint = new Waypoint(pos, forward, up);
+                                        newWaypoint.WaypointIsLocal = true;
+                                        currentLandingSequence.Add(newWaypoint);
+                                    }
+                                }
+                                if (currentLandingSequence.Count > 0)
+                                {
+                                    landingSequences[current_arg] = currentLandingSequence;
+                                }
+                            }
+                        }
+                    }
+
+                }
+            }
+            public string landingSequencesToString()
+            {
+                string o_string = "";
+
+                foreach (KeyValuePair<string, List<Waypoint>> landingSequenceEntry in landingSequences)
+                {
+                    string current_landing_sequence_string = landingSequenceEntry.Key + waypoint_delimeter;
+                    foreach (Waypoint waypoint in landingSequenceEntry.Value)
+                    {
+                        string waypoint_representation = "";
+                        waypoint_representation += waypoint.position.ToString() + waypoint_data_delimeter;
+                        waypoint_representation += waypoint.forward.ToString() + waypoint_data_delimeter;
+                        waypoint_representation += waypoint.up.ToString();
+                        current_landing_sequence_string += waypoint_representation + waypoint_delimeter;
+                    }
+                    o_string += current_landing_sequence_string + landing_sequence_delimeter;
+                }
+                return o_string;
+            }
+
             /// <summary>
             ///     new_arg = the initial argument to be associated with this HomeLocation<br />
             ///     my_connector = the connector on the ship<br />
@@ -53,7 +126,6 @@ namespace IngameScript
                 arguments.Add(new_arg);
                 UpdateData(my_connector, station_connector);
             }
-
 
             public HomeLocation(string saved_data_string, Program parent_program)
             {
@@ -82,7 +154,7 @@ namespace IngameScript
                     Vector3D.TryParse(data_parts[6], out stationConnectorLeft);
                     long.TryParse(data_parts[7], out stationGridID);
                     double.TryParse(data_parts[8], out stationConnectorSize);
-
+                    landingSequencesFromString(data_parts[9]);
                     var argument_parts = data_parts[10].Split(arg_delimeter);
                     foreach (var arg in argument_parts) arguments.Add(arg);
                     UpdateShipConnectorUsingID(parent_program);
@@ -115,7 +187,7 @@ namespace IngameScript
                 o_string += stationGridID.ToString() + main_delimeter;
                 o_string += stationConnectorSize.ToString() + main_delimeter;
 
-                o_string += "NULL for future update" + main_delimeter;
+                o_string += landingSequencesToString() + main_delimeter;
                 //Matrix transformMat = Matrix.
 
                 foreach (var arg in arguments) o_string += arg + arg_delimeter;
@@ -160,6 +232,18 @@ namespace IngameScript
             {
                 return Vector3D.TransformNormal(local_direction, world_matrix);
             }
+
+            public static Vector3D localPositionToWorldPosition(Vector3D local_position, MatrixD world_matrix)
+            {
+                return Vector3D.Transform(local_position, world_matrix);
+            }
+            public static Vector3D localPositionToWorldPosition(Vector3D local_position, HomeLocation referenceHomeLocation)
+            {
+                MatrixD newWorldMatrix = Matrix.CreateWorld(referenceHomeLocation.stationConnectorPosition, referenceHomeLocation.stationConnectorForward,
+                    (-referenceHomeLocation.stationConnectorLeft).Cross(referenceHomeLocation.stationConnectorForward));
+                return Vector3D.Transform(local_position, newWorldMatrix);
+            }
+
 
             //public double angleFromVectors(Vector3D )
             //{
