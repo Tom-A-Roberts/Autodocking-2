@@ -28,13 +28,15 @@ namespace IngameScript
         double topSpeed = 100;                                         // The top speed the ship will go in m/s.
 
         bool extra_soft_landing_mode = false;                 // If your ship is hitting your connector too hard, enable this.
-        double connector_clearance = 0;                          // If you raise this number (measured in meters), the ship will fly up higher before coming down onto the connector.
+        double connector_clearance = 0;                          // If you raise this number (measured in meters), the ship will fly auxilleryDirection higher before coming down onto the connector.
 
         bool enable_antenna_function = true;                   //If enabled, the ship will try to search for an optional home script. Disable if the antenna functionality is giving you problems.
 
 
         // Waypoint settings:
-        double required_waypoint_accuracy = 0.2;              // how close the ship needs to be to a waypoint to complete it (measured in meters).
+        double required_waypoint_accuracy = 5;              // how close the ship needs to be to a waypoint to complete it (measured in meters).
+        double waypoints_top_speed = 100;                   // the top speed the ship will go in m/s when it's moving towards waypoints
+        bool rotate_during_waypoints = true;                // if true, the ship will rotate to face each waypoint's direction as it goes along.
 
 
 
@@ -158,7 +160,9 @@ namespace IngameScript
             {
                 var referenceBlock = systemsAnalyzer.currentHomeLocation.shipConnector;
 
+
                 var referenceOrigin = referenceBlock.GetPosition();
+                
                 var targetDirection = -waypoint.forward;
                 var gravityVecLength = targetDirection.Length();
                 if (targetDirection.LengthSquared() == 0)
@@ -186,7 +190,7 @@ namespace IngameScript
                     targetDirection); //ccw is positive 
                 if (requireYawControl)
                     //angleYaw = 0;
-                    angleYaw = Math.Acos(MathHelper.Clamp(waypoint.up.Dot(referenceLeft), -1, 1)) - Math.PI / 2;
+                    angleYaw = Math.Acos(MathHelper.Clamp(waypoint.auxilleryDirection.Dot(referenceLeft), -1, 1)) - Math.PI / 2;
                 else
                     angleYaw = 0;
                 //shipIOHandler.Echo("Angle Yaw: " + IOHandler.RoundToSignificantDigits(angleYaw, 2).ToString());
@@ -221,6 +225,77 @@ namespace IngameScript
             }
 
             return -1;
+        }
+        private double AlignWithWaypoint(Waypoint waypoint)
+        {
+
+            MatrixD stationConnectorWorldMatrix = Matrix.CreateWorld(systemsAnalyzer.currentHomeLocation.stationConnectorPosition, systemsAnalyzer.currentHomeLocation.stationConnectorForward,
+                (-systemsAnalyzer.currentHomeLocation.stationConnectorLeft).Cross(systemsAnalyzer.currentHomeLocation.stationConnectorForward));
+
+            var referenceGrid = Me.CubeGrid;
+
+            Vector3D waypointForward = HomeLocation.localDirectionToWorldDirection(waypoint.forward, systemsAnalyzer.currentHomeLocation);
+            Vector3D waypointRight = HomeLocation.localDirectionToWorldDirection(waypoint.auxilleryDirection, systemsAnalyzer.currentHomeLocation);
+
+
+            var targetDirection = waypointForward;
+            
+
+
+            var referenceOrigin = referenceGrid.GetPosition();
+
+
+
+            var block_WorldMatrix = Matrix.CreateWorld(referenceOrigin,
+                referenceGrid.WorldMatrix.Up, //referenceBlock.WorldMatrix.Forward,
+                -referenceGrid.WorldMatrix.Forward //referenceBlock.WorldMatrix.Up
+            );
+
+            var referenceForward = block_WorldMatrix.Forward;
+            var referenceLeft = block_WorldMatrix.Left;
+            var referenceUp = block_WorldMatrix.Up;
+
+            anglePitch = Math.Acos(MathHelper.Clamp(targetDirection.Dot(referenceForward), -1, 1)) - Math.PI / 2;
+            //anglePitch *= PID.VectorCompareDirection(targetDirection, referenceForward);
+
+
+            Vector3D relativeLeftVec = referenceForward.Cross(targetDirection);
+            angleRoll = PID.VectorAngleBetween(referenceLeft, relativeLeftVec);
+            angleRoll *= PID.VectorCompareDirection(PID.VectorProjection(referenceLeft, targetDirection),
+                targetDirection); //ccw is positive 
+                                  //angleRoll *= PID.VectorCompareDirection(PID.VectorProjection(referenceLeft, targetDirection),
+                                  //    targetDirection); //ccw is positive 
+
+                                  Vector3D waypointUp = (-waypointRight).Cross(waypointForward);
+            angleYaw = Math.Acos(MathHelper.Clamp((-waypointUp).Dot(referenceLeft), -1, 1)) - Math.PI / 2;
+            //angleYaw *= PID.VectorCompareDirection(PID.VectorProjection(referenceLeft, targetDirection), targetDirection);
+
+            anglePitch *= -1;
+            angleRoll *= -1;
+
+            //shipIOHandler.Echo("Pitch angle: " + Math.Round((anglePitch / Math.PI * 180), 2).ToString() + " deg");
+            //shipIOHandler.Echo("Roll angle: " + Math.Round((angleRoll / Math.PI * 180), 2).ToString() + " deg");
+            //shipIOHandler.Echo("Yaw angle: " + Math.Round((angleYaw / Math.PI * 180), 2).ToString() + " deg");
+
+            //double rawDevAngle = Math.Acos(MathHelper.Clamp(targetDirection.Dot(referenceForward) / targetDirection.Length() * 180 / Math.PI, -1, 1));
+            var rawDevAngle = Math.Acos(MathHelper.Clamp(targetDirection.Dot(referenceForward), -1, 1)) * 180 /
+                                Math.PI;
+            rawDevAngle -= 90;
+
+            //shipIOHandler.Echo("Angle: " + rawDevAngle.ToString());
+
+
+            var rollSpeed = rollPID.Control(angleRoll) * 1;
+            var pitchSpeed = pitchPID.Control(anglePitch) * 1;
+            double yawSpeed = yawPID.Control(angleYaw) * 1;
+
+            //---Set appropriate gyro override  
+            if (!errorState)
+                //do gyros
+                systemsController.ApplyGyroOverride(pitchSpeed, yawSpeed, -rollSpeed, systemsAnalyzer.gyros,
+                    block_WorldMatrix);
+            return rawDevAngle;
+
         }
 
         public void Save()
@@ -363,6 +438,114 @@ namespace IngameScript
             return "Saved docking location as " + argument + ", " + your_title + ".";
         }
 
+
+        private bool recording = false;
+        private bool waiting_for_arg = false;
+        private string recording_arg = "";
+        private List<Vector3D> waypoints_positions;
+        private List<Vector3D> waypoints_forwards;
+        private List<Vector3D> waypoints_rights;
+
+        public void beginRecordingSetup()
+        {
+            recording = true;
+            waiting_for_arg = true;
+            SafelyExit();
+            shipIOHandler.Echo("RECORDING MODE\nPlease enter an argument that\nwill be associated with these waypoints then press Run, " + your_title + ".\n\nTo cancel, press Recompile.");
+        }
+
+        public void beginRecordingWaypoints(string arg)
+        {
+            if (arg.ToLower().Trim() == "record")
+            {
+                shipIOHandler.Echo("RECORDING MODE\nPlease choose an argument\nother than record, then press Run, " + your_title + ".\n\nTo cancel, press Recompile.");
+            }
+            else
+            {
+                recording = true;
+                waiting_for_arg = false;
+                recording_arg = arg;
+                current_waypoint_number = 0;
+                waypoints_positions = new List<Vector3D>();
+                waypoints_forwards = new List<Vector3D>();
+                waypoints_rights = new List<Vector3D>();
+                shipIOHandler.WaypointEcho(recording_arg, current_waypoint_number);
+            }
+        }
+        public void recordWaypoint(IMyShipConnector connectedConnector)
+        {
+            if (connectedConnector == null)
+            {
+                waypoints_positions.Add(Me.CubeGrid.GetPosition());
+                waypoints_forwards.Add(Me.CubeGrid.WorldMatrix.Forward);
+                waypoints_rights.Add(Me.CubeGrid.WorldMatrix.Right);
+
+                current_waypoint_number += 1;
+                shipIOHandler.WaypointEcho(recording_arg, current_waypoint_number);
+            }
+            else
+            {
+                shipIOHandler.Echo("FINISHED RECORDING");
+                if (current_waypoint_number == 0)
+                {
+                    shipIOHandler.Echo("No waypoints recorded.");
+                    var result = updateHomeLocation(recording_arg, connectedConnector);
+                }
+                else
+                {
+                    
+                    recording = false;
+                    waiting_for_arg = false;
+
+                    var result = updateHomeLocation(recording_arg, connectedConnector);
+                    HomeLocation currentHomeLocation = FindHomeLocation(recording_arg);
+
+                    List<Waypoint> landing_sequence = new List<Waypoint>();
+
+                    Vector3D stationConnectorPos = currentHomeLocation.stationConnectorPosition;
+                    Vector3D stationConnectorForward = currentHomeLocation.stationConnectorForward;
+                    Vector3D stationConnectorLeft = currentHomeLocation.stationConnectorLeft;
+
+                    MatrixD stationConnectorWorldMatrix = Matrix.CreateWorld(stationConnectorPos, stationConnectorForward,
+                        (-stationConnectorLeft).Cross(stationConnectorForward));
+
+
+                    for (int waypointIndex = 0; waypointIndex < current_waypoint_number; waypointIndex++)
+                    {
+                        Vector3D waypointGlobalPosition = waypoints_positions[waypointIndex];
+                        Vector3D waypointLocalPositionToStation = HomeLocation.worldPositionToLocalPosition(waypointGlobalPosition, stationConnectorWorldMatrix);
+
+                        Vector3D gridForwardToLocal =
+                            HomeLocation.worldDirectionToLocalDirection(waypoints_forwards[waypointIndex],
+                                stationConnectorWorldMatrix);
+
+                        Vector3D gridRightToLocal =
+                            HomeLocation.worldDirectionToLocalDirection(waypoints_rights[waypointIndex],
+                                stationConnectorWorldMatrix);
+
+
+                        Waypoint newWaypoint = new Waypoint(waypointLocalPositionToStation, gridForwardToLocal,
+                            gridRightToLocal)
+                        {
+                            WaypointIsLocal = true
+                        };
+                        landing_sequence.Add(newWaypoint);
+                    }
+
+                    if (currentHomeLocation.landingSequences.ContainsKey(recording_arg))
+                    {
+                        shipIOHandler.Echo("Overwriting existing waypoints.");
+                    }
+
+                    currentHomeLocation.landingSequences[recording_arg] = landing_sequence;
+
+                    
+                    shipIOHandler.Echo("Recorded " + (current_waypoint_number + 1).ToString() + " waypoints to argument: " + IOHandler.ConvertArg(recording_arg));
+                    current_waypoint_number = 0;
+                }
+            }
+            
+        }
         public void Main(string argument, UpdateType updateSource)
         {
             if ((updateSource & (UpdateType.Update1 | UpdateType.Once | UpdateType.IGC)) == 0)
@@ -380,28 +563,59 @@ namespace IngameScript
                 {
                     // script was activated and there was no error so far.
 
-                    var my_connected_connector = systemsAnalyzer.FindMyConnectedConnector();
-
-                    if (my_connected_connector == null)
+                    if (!recording)
                     {
-                        if (scriptEnabled && argument == current_argument)
+                        var my_connected_connector = systemsAnalyzer.FindMyConnectedConnector();
+                        if (argument.ToLower().Trim() == "record")
                         {
-                            // Script was already running, and using current argument, therefore this is a stopping order.
-                            shipIOHandler.Echo("STOPPED\nAwaiting orders, " + your_title + ".");
-                            SafelyExit();
+                            if (my_connected_connector == null)
+                            {
+                                beginRecordingSetup();
+                            }
+                            else
+                            {
+                                shipIOHandler.Echo("WARNING\nPlease make sure you are not connected\nto a home connector before recording, " + your_title + ".");
+                            }
                         }
-                        else
+                        else 
                         {
-                            // Request to dock initialized.
-                            Begin(argument);
+                            if (my_connected_connector == null)
+                            {
+                                if (scriptEnabled && argument == current_argument)
+                                {
+                                    // Script was already running, and using current argument, therefore this is a stopping order.
+                                    shipIOHandler.Echo("STOPPED\nAwaiting orders, " + your_title + ".");
+                                    SafelyExit();
+                                }
+                                else
+                                {
+                                    // Request to dock initialized.
+                                    Begin(argument);
+                                }
+                            }
+                            else
+                            {
+                                var result = updateHomeLocation(argument, my_connected_connector);
+                                shipIOHandler.Echo(result);
+                                //shipIOHandler.Echo("\nThis location also has\nother arguments associated:");
+                                SafelyExit();
+                            }
                         }
                     }
                     else
                     {
-                        var result = updateHomeLocation(argument, my_connected_connector);
-                        shipIOHandler.Echo(result);
-                        //shipIOHandler.Echo("\nThis location also has\nother arguments associated:");
-                        SafelyExit();
+                        // In recording mode and user pressed "Run"
+
+                        if (waiting_for_arg)
+                        {
+                            beginRecordingWaypoints(argument);
+                        }
+                        else
+                        {
+                            var my_connected_connector = systemsAnalyzer.FindMyConnectedConnector();
+                            recordWaypoint(my_connected_connector);
+                        }
+                        
                     }
                 }
 
@@ -481,7 +695,9 @@ namespace IngameScript
                 if (current_waypoint_number >= landing_sequence.Count)
                 {
                     // We have completed all waypoints so land straight to the connector.
+
                     AutoLandToConnector(true);
+
                 }
                 else
                 {
@@ -493,6 +709,9 @@ namespace IngameScript
                     {
                         nextWaypoint = landing_sequence[current_waypoint_number + 1];
                     }
+
+                    
+
                     double dist_to_waypoint = AutoFollowWaypoint(currentWaypoint, nextWaypoint);
 
                     if (dist_to_waypoint < required_waypoint_accuracy)
@@ -582,7 +801,7 @@ namespace IngameScript
                     var current_position = systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
 
                     //shipIOHandler.Echo("Loc: " + ConnectorLocation.ToString());
-                    //shipIOHandler.Echo("up: " + systemsAnalyzer.currentHomeLocation.stationConnectorUpGlobal.ToString());
+                    //shipIOHandler.Echo("auxilleryDirection: " + systemsAnalyzer.currentHomeLocation.stationConnectorUpGlobal.ToString());
                     //shipIOHandler.Echo("vel: " + systemsAnalyzer.currentHomeLocation.stationVelocity.ToString());
                     //shipIOHandler.Echo("acc: " + systemsAnalyzer.currentHomeLocation.stationAcceleration.ToString());
 
@@ -631,7 +850,7 @@ namespace IngameScript
                             if (sidewaysDistance > sideways_dist_needed_to_land && signedHeightDistanceToConnector <
                                 height_needed_for_connector * 0.9 && !only_last_landing)
                             {
-                                // The ship is behind the connector, so it needs to fly up to it so that it is on the correct side at least.
+                                // The ship is behind the connector, so it needs to fly auxilleryDirection to it so that it is on the correct side at least.
                                 // Only then can it attempt to land.
                                 const double overshoot = 2;
                                 var SomewhereOnCorrectSide =
@@ -735,27 +954,25 @@ namespace IngameScript
             }
             else if (speedSetting == 3)
             {
-                topSpeedUsed = topSpeed;
+                topSpeedUsed = waypoints_top_speed;
             }
             else
             {
-                topSpeedUsed = topSpeed;
+                topSpeedUsed = waypoints_top_speed;
             }
-            if (topSpeedUsed > topSpeed) topSpeedUsed = topSpeed;
+            if (topSpeedUsed > waypoints_top_speed) topSpeedUsed = waypoints_top_speed;
             #endregion
 
 
-            var speedDampener = 1 - systemsAnalyzer.currentHomeLocation.stationVelocity.Length() / 100 * 0.2;
-            var WaypointLocation = systemsAnalyzer.currentHomeLocation.stationConnectorPosition +
-                                    DeltaTimeReal * systemsAnalyzer.currentHomeLocation.stationVelocity *
-                                    speedDampener;
-            var current_position = systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
+            //var speedDampener = 1 - systemsAnalyzer.currentHomeLocation.stationVelocity.Length() / 100 * 0.2;
+            //var WaypointLocation = currentWaypoint.position + (DeltaTimeReal * systemsAnalyzer.currentHomeLocation.stationVelocity * speedDampener);
+            //var current_position = Me.CubeGrid.GetPosition();
 
 
-            var point_in_sequence = "Starting...";
+            //var point_in_sequence = "Starting...";
 
             // Constantly ensure alignment
-            double direction_accuracy = AlignWithGravity(currentWaypoint, true);
+            double direction_accuracy = AlignWithWaypoint(currentWaypoint);
 
             if (speedSetting == 1)
                 currentWaypoint.maximumAcceleration = 5;
@@ -764,13 +981,17 @@ namespace IngameScript
             else
                 currentWaypoint.maximumAcceleration = 5;
 
-            MoveToWaypoint(currentWaypoint);
-            point_in_sequence = "Waypoint " + current_waypoint_number.ToString() + ".";
+            double dist_left = MoveToWaypoint(currentWaypoint);
+            //point_in_sequence = "Waypoint " + current_waypoint_number.ToString() + ".";
                             
             if (extra_info)
             {
                 shipIOHandler.Echo("Status: " + status);
-                shipIOHandler.Echo("Place in sequence: " + point_in_sequence);
+                shipIOHandler.Echo("Moving to waypoint: " + (current_waypoint_number+1).ToString());
+            }
+            else
+            {
+                shipIOHandler.Echo("Moving to waypoint: " + (current_waypoint_number + 1).ToString() + ".");
             }
 
             var elapsed = DateTime.Now - scriptStartTime;
@@ -778,7 +999,7 @@ namespace IngameScript
                                 elapsed.Milliseconds.ToString().Substring(0, 1));
             shipIOHandler.EchoFinish();
 
-            return (current_position - WaypointLocation).Length();
+            return dist_left;
         }
 
 
@@ -804,11 +1025,6 @@ namespace IngameScript
 
             var UnknownAcceleration = -systemsAnalyzer.currentHomeLocation.stationAcceleration * safetyAcceleration;
 
-            //if(UnknownAcceleration.Length() > safetyAcceleration)
-            //{
-            //    UnknownAcceleration = Vector3D.Normalize(UnknownAcceleration);
-            //}
-
             var Gravity_And_Unknown_Forces = (systemsAnalyzer.cockpit.GetNaturalGravity() + UnknownAcceleration) *
                                              systemsAnalyzer.shipMass;
             // + (systemsAnalyzer.currentHomeLocation.stationVelocity * DeltaTimeReal))
@@ -820,7 +1036,14 @@ namespace IngameScript
                 waypointPos = HomeLocation.localPositionToWorldPosition(waypointPos, systemsAnalyzer.currentHomeLocation);
             }
 
+            //var TargetRoute = waypointPos - systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
             var TargetRoute = waypointPos - systemsAnalyzer.currentHomeLocation.shipConnector.GetPosition();
+
+            if (waypoint.WaypointIsLocal)
+            {
+                TargetRoute = waypointPos - Me.CubeGrid.GetPosition();
+            }
+
             var TargetDirection = Vector3D.Normalize(TargetRoute);
             var totalDistanceLeft = TargetRoute.Length();
 

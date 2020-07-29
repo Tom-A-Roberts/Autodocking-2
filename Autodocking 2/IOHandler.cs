@@ -101,6 +101,19 @@ namespace IngameScript
                                 timer.Trigger();
             }
 
+
+            public void WaypointEcho(string arg, int count)
+            {
+                if (count == 0)
+                {
+                    Echo("RECORDING MODE\nRecording to argument: " + ConvertArg(arg) + ".\nPressing Run will record\nposition and rotation. To finish, press Run when docked.\n\nTo cancel, press Recompile.");
+                }
+                else
+                {
+                    Echo("RECORDING MODE\nRecorded " + count + " waypoints to argument: " + ConvertArg(arg) + ".\nPressing Run will record position and rotation again. To finish, press Run when docked.\n\nTo cancel, press Recompile.");
+                }
+            }
+
             /// <summary>
             ///     This will output the accumulated Echo line to the user.<br />
             ///     The bool parameter defines where the output will be:<br />

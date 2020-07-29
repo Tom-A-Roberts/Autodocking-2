@@ -28,24 +28,21 @@ namespace IngameScript
             /// </summary>
             public Vector3D position;
 
-            /// <summary>
-            /// The location of the waypoint in global space
-            /// </summary>
             public double required_accuracy = 0.1;
             public bool RequireRotation = true;
             public bool WaypointIsLocal = false;
 
             /// <summary>
-            /// The "up" rotation of the docking connector, as if it's a 
+            /// The "auxilleryDirection" rotation of the docking connector, as if it's a 
             /// </summary>
-            public Vector3D up;
+            public Vector3D auxilleryDirection;
 
 
-            public Waypoint(Vector3D _pos, Vector3D _forward, Vector3D _up)
+            public Waypoint(Vector3D _pos, Vector3D _forward, Vector3D _auxilleryDirection)
             {
                 position = _pos;
                 forward = _forward;
-                up = _up;
+                auxilleryDirection = _auxilleryDirection;
             }
         }
     }

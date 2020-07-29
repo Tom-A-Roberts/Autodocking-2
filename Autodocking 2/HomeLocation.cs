@@ -37,7 +37,7 @@ namespace IngameScript
 
             public double stationConnectorSize;
 
-            // These are SAVED directions! NOT world matrix up
+            // These are SAVED directions! NOT world matrix auxilleryDirection
             public Vector3D stationConnectorUpGlobal;
             public Vector3D stationConnectorUpLocal;
             public long stationGridID;
@@ -105,7 +105,7 @@ namespace IngameScript
                         string waypoint_representation = "";
                         waypoint_representation += waypoint.position.ToString() + waypoint_data_delimeter;
                         waypoint_representation += waypoint.forward.ToString() + waypoint_data_delimeter;
-                        waypoint_representation += waypoint.up.ToString();
+                        waypoint_representation += waypoint.auxilleryDirection.ToString();
                         current_landing_sequence_string += waypoint_representation + waypoint_delimeter;
                     }
                     o_string += current_landing_sequence_string + landing_sequence_delimeter;
@@ -215,8 +215,7 @@ namespace IngameScript
                     my_connector.WorldMatrix.Left));
                 var saved_up = normalizedleft.Cross(stationConnectorForward);
                 stationConnectorUpGlobal = saved_up;
-                stationConnectorUpLocal =
-                    worldDirectionToLocalDirection(stationConnectorUpGlobal, station_connector.WorldMatrix);
+                stationConnectorUpLocal = worldDirectionToLocalDirection(stationConnectorUpGlobal, station_connector.WorldMatrix);
 
 
                 stationGridID = station_connector.CubeGrid.EntityId;
@@ -232,6 +231,13 @@ namespace IngameScript
             {
                 return Vector3D.TransformNormal(local_direction, world_matrix);
             }
+            public static Vector3D localDirectionToWorldDirection(Vector3D local_direction, HomeLocation referenceHomeLocation)
+            {
+                MatrixD newWorldMatrix = Matrix.CreateWorld(referenceHomeLocation.stationConnectorPosition, referenceHomeLocation.stationConnectorForward,
+                    (-referenceHomeLocation.stationConnectorLeft).Cross(referenceHomeLocation.stationConnectorForward));
+                return Vector3D.TransformNormal(local_direction, newWorldMatrix); ;
+            }
+
 
             public static Vector3D localPositionToWorldPosition(Vector3D local_position, MatrixD world_matrix)
             {
@@ -243,6 +249,13 @@ namespace IngameScript
                     (-referenceHomeLocation.stationConnectorLeft).Cross(referenceHomeLocation.stationConnectorForward));
                 return Vector3D.Transform(local_position, newWorldMatrix);
             }
+            public static Vector3D worldPositionToLocalPosition(Vector3D world_position, MatrixD world_matrix)
+            {
+                Vector3D worldDirection = world_position - world_matrix.Translation;
+
+                return Vector3D.TransformNormal(worldDirection, MatrixD.Transpose(world_matrix));
+            }
+
 
 
             //public double angleFromVectors(Vector3D )
