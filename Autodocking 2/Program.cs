@@ -109,6 +109,7 @@ namespace IngameScript
 
         public Program()
         {
+
             errorState = false;
             Runtime.UpdateFrequency = UpdateFrequency.Once;
             platformVelocity = Vector3D.Zero;
@@ -299,6 +300,12 @@ namespace IngameScript
         }
 
         public void Save()
+        {
+
+            produceDataString();
+        }
+
+        public void produceDataString()
         {
             Storage = "";
             //if (copy_paste_persistant_memory)
@@ -546,6 +553,58 @@ namespace IngameScript
             }
             
         }
+
+        public string checkForClear(string argument)
+        {
+
+            string[] split = argument.Split(' ');
+
+            if (split.Length > 1)
+            {
+                if (split[0].ToLower() == "clear")
+                {
+                    return argument.Remove(0, 6);
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        public void ClearMemoryLocation(string argument)
+        {
+            //Check if any homelocations had that argument before, if so, remove it.
+            bool found_arg = false;
+            var toDelete = new List<HomeLocation>();
+            foreach (var currentHomeLocation in homeLocations)
+                if (currentHomeLocation.arguments.Contains(argument)) {
+                        currentHomeLocation.arguments.Remove(argument);
+                        found_arg = true;
+                        if (currentHomeLocation.arguments.Count == 0) toDelete.Add(currentHomeLocation);
+                }
+
+            while (toDelete.Count > 0)
+            {
+                homeLocations.Remove(toDelete[0]);
+                toDelete.RemoveAt(0);
+            }
+
+            if (found_arg)
+            {
+                shipIOHandler.Echo("CLEARED\nThe argument: " + IOHandler.ConvertArg(argument) + "\nhas been cleared from memory.");
+            }
+            else
+            {
+                shipIOHandler.Echo("WARNING\nThe argument: " + IOHandler.ConvertArg(argument) + "\nwasn't found in memory.");
+            }
+            
+        }
+
         public void Main(string argument, UpdateType updateSource)
         {
             if ((updateSource & (UpdateType.Update1 | UpdateType.Once | UpdateType.IGC)) == 0)
@@ -566,6 +625,7 @@ namespace IngameScript
                     if (!recording)
                     {
                         var my_connected_connector = systemsAnalyzer.FindMyConnectedConnector();
+                        var clear_command = checkForClear(argument);
                         if (argument.ToLower().Trim() == "record")
                         {
                             if (my_connected_connector == null)
@@ -577,7 +637,17 @@ namespace IngameScript
                                 shipIOHandler.Echo("WARNING\nPlease make sure you are not connected\nto a home connector before recording, " + your_title + ".");
                             }
                         }
-                        else 
+
+                        else if (argument.ToLower().Trim() == "[data_output_request]")
+                        {
+                            produceDataString();
+                            Me.CustomData = Storage;
+                        }else if (clear_command != null)
+                        {
+                            ClearMemoryLocation(clear_command);
+                        }
+
+                        else
                         {
                             if (my_connected_connector == null)
                             {
@@ -972,7 +1042,11 @@ namespace IngameScript
             //var point_in_sequence = "Starting...";
 
             // Constantly ensure alignment
-            double direction_accuracy = AlignWithWaypoint(currentWaypoint);
+            if (rotate_during_waypoints)
+            {
+                AlignWithWaypoint(currentWaypoint);
+            }
+            
 
             if (speedSetting == 1)
                 currentWaypoint.maximumAcceleration = 5;
@@ -987,7 +1061,7 @@ namespace IngameScript
             if (extra_info)
             {
                 shipIOHandler.Echo("Status: " + status);
-                shipIOHandler.Echo("Moving to waypoint: " + (current_waypoint_number+1).ToString());
+                shipIOHandler.Echo("Moving to waypoint: " + (current_waypoint_number+1).ToString() + ".");
             }
             else
             {
