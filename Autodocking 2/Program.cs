@@ -32,11 +32,12 @@ namespace IngameScript
 
         bool enable_antenna_function = true;                   //If enabled, the ship will try to search for an optional home script. Disable if the antenna functionality is giving you problems.
 
+        bool allow_connector_on_seperate_grid = false; // WARNING: All connectors on your must have [dock] in the name if you set this to true! This option allows your connector to not be on the same grid.
 
         // Waypoint settings:
-        double required_waypoint_accuracy = 5;              // how close the ship needs to be to a waypoint to complete it (measured in meters).
-        double waypoints_top_speed = 100;                   // the top speed the ship will go in m/s when it's moving towards waypoints
-        bool rotate_during_waypoints = true;                // if true, the ship will rotate to face each waypoint's direction as it goes along.
+        double required_waypoint_accuracy = 5;             // how close the ship needs to be to a waypoint to complete it (measured in meters).
+        double waypoints_top_speed = 100;                     // the top speed the ship will go in m/s when it's moving towards waypoints
+        bool rotate_during_waypoints = true;                    // if true, the ship will rotate to face each waypoint's direction as it goes along.
 
 
 
