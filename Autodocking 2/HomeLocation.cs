@@ -30,6 +30,10 @@ namespace IngameScript
             public Vector3D stationConnectorPosition;
 
 
+
+            public string stationConnectorName = null;
+            public string stationGridName = null;
+
             //public Vector3D stationConnectorUpGlobal;
             //public Vector3D stationOriginalConnectorPosition;
             //public Vector3D stationOriginalConnectorForward;
@@ -75,11 +79,20 @@ namespace IngameScript
                                         Vector3D pos = new Vector3D();
                                         Vector3D forward = new Vector3D();
                                         Vector3D up = new Vector3D();
+                                        double waypoint_accuracy = 0.2;
+                                        double top_speed = 1;
+                                        bool require_rotation = true;
                                         Vector3D.TryParse(waypoint_data[0], out pos);
                                         Vector3D.TryParse(waypoint_data[1], out forward);
                                         Vector3D.TryParse(waypoint_data[2], out up);
+                                        double.TryParse(waypoint_data[3], out top_speed);
+                                        bool.TryParse(waypoint_data[4], out require_rotation);
+                                        double.TryParse(waypoint_data[5], out waypoint_accuracy);
                                         Waypoint newWaypoint = new Waypoint(pos, forward, up);
                                         newWaypoint.WaypointIsLocal = true;
+                                        newWaypoint.waypoint_completion_accuracy = waypoint_accuracy;
+                                        newWaypoint.top_speed = top_speed;
+                                        newWaypoint.RequireRotation = require_rotation;
                                         currentLandingSequence.Add(newWaypoint);
                                     }
                                 }
@@ -105,13 +118,33 @@ namespace IngameScript
                         string waypoint_representation = "";
                         waypoint_representation += waypoint.position.ToString() + waypoint_data_delimeter;
                         waypoint_representation += waypoint.forward.ToString() + waypoint_data_delimeter;
-                        waypoint_representation += waypoint.auxilleryDirection.ToString();
+                        waypoint_representation += waypoint.auxilleryDirection.ToString() + waypoint_data_delimeter;
+                        waypoint_representation += waypoint.top_speed.ToString() + waypoint_data_delimeter;
+                        waypoint_representation += waypoint.RequireRotation.ToString() + waypoint_data_delimeter;
+                        waypoint_representation += waypoint.waypoint_completion_accuracy.ToString();
                         current_landing_sequence_string += waypoint_representation + waypoint_delimeter;
                     }
                     o_string += current_landing_sequence_string + landing_sequence_delimeter;
                 }
                 return o_string;
             }
+
+            public void ExtractSavedNames(string data_string)
+            {
+                string[] data_split = data_string.Split(waypoint_delimeter);
+                stationGridName = data_split[0];
+                stationConnectorName = data_split[1];
+            }
+
+            public string ProduceSavedNames()
+            {
+                string o_string = "";
+                o_string += stationGridName + waypoint_delimeter;
+                o_string += stationConnectorName;
+                return o_string;
+            }
+
+
 
             /// <summary>
             ///     new_arg = the initial argument to be associated with this HomeLocation<br />
@@ -143,7 +176,7 @@ namespace IngameScript
                     foreach (var arg in argument_parts) arguments.Add(arg);
                     UpdateShipConnectorUsingID(parent_program);
                 }
-                else if (data_parts.Length == 11)
+                else if (data_parts.Length == 12)
                 {
                     long.TryParse(data_parts[0], out shipConnectorID);
                     long.TryParse(data_parts[1], out stationConnectorID);
@@ -155,7 +188,8 @@ namespace IngameScript
                     long.TryParse(data_parts[7], out stationGridID);
                     double.TryParse(data_parts[8], out stationConnectorSize);
                     landingSequencesFromString(data_parts[9]);
-                    var argument_parts = data_parts[10].Split(arg_delimeter);
+                    ExtractSavedNames(data_parts[10]);
+                    var argument_parts = data_parts[11].Split(arg_delimeter);
                     foreach (var arg in argument_parts) arguments.Add(arg);
                     UpdateShipConnectorUsingID(parent_program);
                 }
@@ -190,8 +224,40 @@ namespace IngameScript
                 o_string += landingSequencesToString() + main_delimeter;
                 //Matrix transformMat = Matrix.
 
+                o_string += ProduceSavedNames() + main_delimeter;
+
                 foreach (var arg in arguments) o_string += arg + arg_delimeter;
                 o_string = o_string.Substring(0, o_string.Length - 1);
+
+                return o_string;
+            }
+
+            public string ProduceUserFriendlyData()
+            {
+                var o_string = "";
+
+                foreach (var arg in arguments)
+                {
+                    o_string += stationGridName + ";";
+                    o_string += stationConnectorName + ";";
+                    o_string += shipConnector.CustomName + ";";
+                    o_string += arg + ";";
+                    int waypointCount = 0;
+                    if (landingSequences.ContainsKey(arg))
+                    {
+                        waypointCount = landingSequences[arg].Count;
+                    }
+
+                    o_string += waypointCount.ToString();
+                    o_string += "\n";
+
+                }
+
+                if (o_string.Length > 1)
+                {
+                    o_string = o_string.Substring(0, o_string.Length - 1);
+                }
+                
 
                 return o_string;
             }
@@ -210,6 +276,9 @@ namespace IngameScript
                 stationConnectorPosition = station_connector.GetPosition();
                 stationConnectorForward = station_connector.WorldMatrix.Forward;
                 stationConnectorLeft = station_connector.WorldMatrix.Left;
+
+                stationConnectorName = station_connector.CustomName;
+                stationGridName = station_connector.CubeGrid.CustomName;
 
                 var normalizedleft = Vector3D.Normalize(PID.ProjectPointOnPlane(stationConnectorForward, Vector3D.Zero,
                     my_connector.WorldMatrix.Left));

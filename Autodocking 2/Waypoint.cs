@@ -23,6 +23,8 @@ namespace IngameScript
             /// </summary>
             public double PercentageOfMaxAcceleration = 1;
 
+            public double waypoint_completion_accuracy = 5;
+            public double top_speed = 1;
             /// <summary>
             /// The location of the waypoint in global space
             /// </summary>

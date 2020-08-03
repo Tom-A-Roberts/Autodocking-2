@@ -47,6 +47,9 @@ namespace IngameScript
             public Dictionary<Base6Directions.Direction, ThrusterGroup> thrusterGroups;
 
             public List<IMyThrust> thrusters = new List<IMyThrust>();
+            double off_thrusters_count = 0;
+
+
             public ThrusterGroup UpThrust;
 
 
@@ -355,6 +358,13 @@ namespace IngameScript
                 foreach (var block in parent_program.blocks)
                     if (block is IMyThrust && block.IsWorking && blockIsOnMyGrid(block))
                         o_thrusters.Add((IMyThrust) block);
+                    else if (block is IMyThrust)
+                    {
+                        if (!((IMyThrust)block).Enabled && blockIsOnMyGrid(block))
+                        {
+                            off_thrusters_count += 1;
+                        }
+                    }
                 return o_thrusters;
             }
 
@@ -526,27 +536,44 @@ namespace IngameScript
                         }
                     }
 
+                string err_string = "";
                 if (unusedDirections.Count == 6)
                 {
-                    parent_program.shipIOHandler.Error("Sorry " + parent_program.your_title +
-                                                       ", I couldn't seem to find any thrusters on your ship.");
+                    err_string = "Sorry " + parent_program.your_title + ", I couldn't seem to find any thrusters on your ship.";
+                    if (off_thrusters_count > 0)
+                    {
+                        err_string += "\nI have detected that some thrusters\nare disabled. Could this be the problem?";
+                    }
+                    parent_program.shipIOHandler.Error(err_string);
                 }
                 else if (unusedDirections.Count == 1)
                 {
-                    parent_program.shipIOHandler.Error("Sorry " + parent_program.your_title +
-                                                       ", it's required that all 6 directions have at least one thruster.\nThe missing direction might be " +
-                                                       unusedDirections[0] + "."); //
+                    err_string = "Sorry " + parent_program.your_title +
+                                 ", it's required that all 6 directions have at least one thruster.\nThe missing direction might be " +
+                                 unusedDirections[0] + ".";
+                    if (off_thrusters_count > 0)
+                    {
+                        err_string += "\nI have detected that some thrusters\nare disabled. Could this be the problem?";
+                    }
+                    parent_program.shipIOHandler.Error(err_string); //
                 }
                 else if (unusedDirections.Count > 1)
                 {
                     var total_string = "";
                     foreach (var di in unusedDirections) total_string += di + "-";
 
+                    err_string = "Sorry " + parent_program.your_title +
+                                 ", it's required that all 6 directions have at least one thruster.\nIt seems the missing directions might be: " +
+                                 total_string;
+                    if (off_thrusters_count > 0)
+                    {
+                        err_string += "\nI have detected that some thrusters\nare disabled. Could this be the problem?";
+                    }
 
-                    parent_program.shipIOHandler.Error("Sorry " + parent_program.your_title +
-                                                       ", it's required that all 6 directions have at least one thruster.\nIt seems the missing directions might be: " +
-                                                       total_string); // 
+                    parent_program.shipIOHandler.Error(err_string); // 
                 }
+
+
             }
 
             public void UpdateThrusterGroupsWorldDirections()

@@ -35,7 +35,7 @@ namespace IngameScript
         bool allow_connector_on_seperate_grid = false; // WARNING: All connectors on your must have [dock] in the name if you set this to true! This option allows your connector to not be on the same grid.
 
         // Waypoint settings:
-        double required_waypoint_accuracy = 5;             // how close the ship needs to be to a waypoint to complete it (measured in meters).
+        double required_waypoint_accuracy = 6;             // how close the ship needs to be to a waypoint to complete it (measured in meters). Do note, closer waypoints are more accurate anyway.
         double waypoints_top_speed = 100;                     // the top speed the ship will go in m/s when it's moving towards waypoints
         bool rotate_during_waypoints = true;                    // if true, the ship will rotate to face each waypoint's direction as it goes along.
 
@@ -480,6 +480,16 @@ namespace IngameScript
                 shipIOHandler.WaypointEcho(recording_arg, current_waypoint_number);
             }
         }
+
+        public double accuracyFromDistance(Vector3D start_pos, Vector3D end_pos)
+        {
+            double dist = Vector3D.Distance(start_pos, end_pos) / 4;
+            if (dist < 0.2)
+            {
+                dist = 0.2;
+            }
+            return dist;
+        }
         public void recordWaypoint(IMyShipConnector connectedConnector)
         {
             if (connectedConnector == null)
@@ -517,11 +527,25 @@ namespace IngameScript
                     MatrixD stationConnectorWorldMatrix = Matrix.CreateWorld(stationConnectorPos, stationConnectorForward,
                         (-stationConnectorLeft).Cross(stationConnectorForward));
 
-
+                    Vector3D last_world_pos = Vector3D.Zero;
                     for (int waypointIndex = 0; waypointIndex < current_waypoint_number; waypointIndex++)
                     {
                         Vector3D waypointGlobalPosition = waypoints_positions[waypointIndex];
                         Vector3D waypointLocalPositionToStation = HomeLocation.worldPositionToLocalPosition(waypointGlobalPosition, stationConnectorWorldMatrix);
+
+                        double calculated_accuracy = required_waypoint_accuracy;
+                        if (waypointIndex > 0)
+                        {
+                            double last_accuracy = accuracyFromDistance(waypointGlobalPosition, last_world_pos);
+                            calculated_accuracy = Math.Min(last_accuracy, required_waypoint_accuracy);
+                        }
+                        if (waypointIndex == current_waypoint_number - 1)
+                        {
+                            double last_accuracy = accuracyFromDistance(waypointGlobalPosition, stationConnectorPos) * 0.7;
+                            calculated_accuracy = Math.Min(last_accuracy, calculated_accuracy);
+                        }
+                        
+
 
                         Vector3D gridForwardToLocal =
                             HomeLocation.worldDirectionToLocalDirection(waypoints_forwards[waypointIndex],
@@ -535,8 +559,13 @@ namespace IngameScript
                         Waypoint newWaypoint = new Waypoint(waypointLocalPositionToStation, gridForwardToLocal,
                             gridRightToLocal)
                         {
-                            WaypointIsLocal = true
+                            WaypointIsLocal = true,
+                            maximumAcceleration = 15,
+                            RequireRotation = true,
+                            waypoint_completion_accuracy = calculated_accuracy,
+                            top_speed = topSpeed
                         };
+                        last_world_pos = waypointGlobalPosition;
                         landing_sequence.Add(newWaypoint);
                     }
 
@@ -585,6 +614,10 @@ namespace IngameScript
             foreach (var currentHomeLocation in homeLocations)
                 if (currentHomeLocation.arguments.Contains(argument)) {
                         currentHomeLocation.arguments.Remove(argument);
+                        if (currentHomeLocation.landingSequences.ContainsKey(argument))
+                        {
+                            currentHomeLocation.landingSequences.Remove(argument);
+                        }
                         found_arg = true;
                         if (currentHomeLocation.arguments.Count == 0) toDelete.Add(currentHomeLocation);
                 }
@@ -605,6 +638,24 @@ namespace IngameScript
             }
             
         }
+
+        public string ProduceDataOutputString()
+        {
+            string o_string = "";
+            foreach (var homeLocation in homeLocations)
+            {
+                o_string += homeLocation.ProduceUserFriendlyData() + "\n";
+
+            }
+
+            if (o_string.Length > 1)
+            {
+                o_string = o_string.Substring(0, o_string.Length - 1);
+            }
+
+            return o_string;
+        }
+
 
         public void Main(string argument, UpdateType updateSource)
         {
@@ -641,9 +692,9 @@ namespace IngameScript
 
                         else if (argument.ToLower().Trim() == "[data_output_request]")
                         {
-                            produceDataString();
-                            Me.CustomData = Storage;
-                        }else if (clear_command != null)
+                            Me.CustomData = ProduceDataOutputString();
+                        }
+                        else if (clear_command != null)
                         {
                             ClearMemoryLocation(clear_command);
                         }
@@ -785,7 +836,10 @@ namespace IngameScript
 
                     double dist_to_waypoint = AutoFollowWaypoint(currentWaypoint, nextWaypoint);
 
-                    if (dist_to_waypoint < required_waypoint_accuracy)
+                    double accuracy = Math.Min(required_waypoint_accuracy,
+                        currentWaypoint.waypoint_completion_accuracy);
+
+                    if (dist_to_waypoint < accuracy)
                     {
                         // We've reached the latest waypoint.
                         current_waypoint_number += 1;
@@ -1054,7 +1108,7 @@ namespace IngameScript
             else if (speedSetting == 3)
                 currentWaypoint.maximumAcceleration = 15;
             else
-                currentWaypoint.maximumAcceleration = 5;
+                currentWaypoint.maximumAcceleration = 20;
 
             double dist_left = MoveToWaypoint(currentWaypoint);
             //point_in_sequence = "Waypoint " + current_waypoint_number.ToString() + ".";
