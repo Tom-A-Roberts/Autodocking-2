@@ -102,7 +102,7 @@ namespace IngameScript
             }
 
 
-            public void WaypointEcho(string arg, int count)
+            public void WaypointEcho(string arg, int count, string extra_output)
             {
                 if (count == 0)
                 {
@@ -110,7 +110,7 @@ namespace IngameScript
                 }
                 else
                 {
-                    Echo("RECORDING MODE\nRecorded " + count + " waypoints to argument: " + ConvertArg(arg) + ".\nPressing Run will record position and rotation again. To finish, press Run when docked.\n\nTo cancel, press Recompile.");
+                    Echo("RECORDING MODE\nRecorded " + count + " waypoints to argument: " + ConvertArg(arg) + extra_output + "\nPressing Run will record position and rotation again. To finish, press Run when docked.\n\nTo cancel, press Recompile.");
                 }
             }
 

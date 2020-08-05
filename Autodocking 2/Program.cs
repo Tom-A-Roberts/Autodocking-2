@@ -32,7 +32,7 @@ namespace IngameScript
 
         bool enable_antenna_function = true;                   //If enabled, the ship will try to search for an optional home script. Disable if the antenna functionality is giving you problems.
 
-        bool allow_connector_on_seperate_grid = false; // WARNING: All connectors on your must have [dock] in the name if you set this to true! This option allows your connector to not be on the same grid.
+        bool allow_connector_on_seperate_grid = false; // WARNING: All connectors on your ship must have [dock] in the name if you set this to true! This option allows your connector to not be on the same grid.
 
         // Waypoint settings:
         double required_waypoint_accuracy = 6;             // how close the ship needs to be to a waypoint to complete it (measured in meters). Do note, closer waypoints are more accurate anyway.
@@ -302,7 +302,6 @@ namespace IngameScript
 
         public void Save()
         {
-
             produceDataString();
         }
 
@@ -453,6 +452,8 @@ namespace IngameScript
         private List<Vector3D> waypoints_positions;
         private List<Vector3D> waypoints_forwards;
         private List<Vector3D> waypoints_rights;
+        private List<double> waypoints_speeds;
+        private List<bool> waypoints_rotates;
 
         public void beginRecordingSetup()
         {
@@ -477,7 +478,9 @@ namespace IngameScript
                 waypoints_positions = new List<Vector3D>();
                 waypoints_forwards = new List<Vector3D>();
                 waypoints_rights = new List<Vector3D>();
-                shipIOHandler.WaypointEcho(recording_arg, current_waypoint_number);
+                waypoints_speeds = new List<double>();
+                waypoints_rotates = new List<bool>();
+                shipIOHandler.WaypointEcho(recording_arg, current_waypoint_number, "");
             }
         }
 
@@ -490,7 +493,7 @@ namespace IngameScript
             }
             return dist;
         }
-        public void recordWaypoint(IMyShipConnector connectedConnector)
+        public void recordWaypoint(IMyShipConnector connectedConnector, string argument)
         {
             if (connectedConnector == null)
             {
@@ -498,8 +501,42 @@ namespace IngameScript
                 waypoints_forwards.Add(Me.CubeGrid.WorldMatrix.Forward);
                 waypoints_rights.Add(Me.CubeGrid.WorldMatrix.Right);
 
+                double speed = -1;
+                bool waypoints_rotate = true;
+                if (argument.Trim().Length > 1)
+                {
+                    if (argument.Trim()[0] == '!')
+                    {
+                        string second_part = argument.Remove(0, 1);
+                        double speed_num;
+                        bool result = double.TryParse(second_part, out speed_num);
+                        if (result)
+                        {
+                            speed = speed_num;
+                            
+                        }
+                    }
+                }
+                if (argument.ToLower().Trim().Contains("no spin") || argument.ToLower().Trim().Contains("nospin") || argument.ToLower().Trim().Contains("!nospin"))
+                {
+                    waypoints_rotate = false;
+                }
+                waypoints_speeds.Add(speed);
+                waypoints_rotates.Add(waypoints_rotate);
+
+                string extra_output = "";
+                if (speed > 0)
+                {
+                    extra_output = "\nRecorded speed: " + speed;
+                }
+                if (!waypoints_rotate)
+                {
+                    extra_output += "\nRecorded no rotate";
+                }
                 current_waypoint_number += 1;
-                shipIOHandler.WaypointEcho(recording_arg, current_waypoint_number);
+                shipIOHandler.WaypointEcho(recording_arg, current_waypoint_number, extra_output);
+
+
             }
             else
             {
@@ -555,15 +592,20 @@ namespace IngameScript
                             HomeLocation.worldDirectionToLocalDirection(waypoints_rights[waypointIndex],
                                 stationConnectorWorldMatrix);
 
+                        double waypoint_speed = waypoints_speeds[waypointIndex];
+                        if (waypoint_speed < 0)
+                        {
+                            waypoint_speed = waypoints_top_speed;
+                        }
 
                         Waypoint newWaypoint = new Waypoint(waypointLocalPositionToStation, gridForwardToLocal,
                             gridRightToLocal)
                         {
                             WaypointIsLocal = true,
                             maximumAcceleration = 15,
-                            RequireRotation = true,
+                            RequireRotation = waypoints_rotates[waypointIndex],
                             waypoint_completion_accuracy = calculated_accuracy,
-                            top_speed = topSpeed
+                            top_speed = waypoint_speed
                         };
                         last_world_pos = waypointGlobalPosition;
                         landing_sequence.Add(newWaypoint);
@@ -665,9 +707,14 @@ namespace IngameScript
                 // Script is activated by pressing "Run"
                 if (errorState)
                 {
+                    if (argument.ToLower().Trim() == "[data_output_request]")
+                    {
+                        Me.CustomData = ProduceDataOutputString();
+                    }
                     // If an error has happened
                     errorState = false;
                     systemsAnalyzer.GatherBasicData();
+
                 }
 
                 if (!errorState)
@@ -735,7 +782,7 @@ namespace IngameScript
                         else
                         {
                             var my_connected_connector = systemsAnalyzer.FindMyConnectedConnector();
-                            recordWaypoint(my_connected_connector);
+                            recordWaypoint(my_connected_connector, argument);
                         }
                         
                     }
@@ -1079,13 +1126,15 @@ namespace IngameScript
             }
             else if (speedSetting == 3)
             {
-                topSpeedUsed = waypoints_top_speed;
+                topSpeedUsed = currentWaypoint.top_speed;
             }
             else
             {
-                topSpeedUsed = waypoints_top_speed;
+                topSpeedUsed = currentWaypoint.top_speed;
             }
-            if (topSpeedUsed > waypoints_top_speed) topSpeedUsed = waypoints_top_speed;
+            if (topSpeedUsed > currentWaypoint.top_speed) topSpeedUsed = currentWaypoint.top_speed;
+
+
             #endregion
 
 
@@ -1097,14 +1146,14 @@ namespace IngameScript
             //var point_in_sequence = "Starting...";
 
             // Constantly ensure alignment
-            if (rotate_during_waypoints)
+            if (rotate_during_waypoints && currentWaypoint.RequireRotation)
             {
                 AlignWithWaypoint(currentWaypoint);
             }
             
 
             if (speedSetting == 1)
-                currentWaypoint.maximumAcceleration = 5;
+                currentWaypoint.maximumAcceleration = 15;
             else if (speedSetting == 3)
                 currentWaypoint.maximumAcceleration = 15;
             else

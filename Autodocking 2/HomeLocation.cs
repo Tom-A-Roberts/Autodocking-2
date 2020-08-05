@@ -34,11 +34,6 @@ namespace IngameScript
             public string stationConnectorName = null;
             public string stationGridName = null;
 
-            //public Vector3D stationConnectorUpGlobal;
-            //public Vector3D stationOriginalConnectorPosition;
-            //public Vector3D stationOriginalConnectorForward;
-            //public Vector3D stationOriginalConnectorUp;
-
             public double stationConnectorSize;
 
             // These are SAVED directions! NOT world matrix auxilleryDirection
