@@ -65,6 +65,25 @@ namespace IngameScript
                 return 1;
             }
 
+            public static double VectorSignedAngleBetween(Vector3D current, Vector3D target, Vector3D axisOfRotation, bool requireProjection = false)
+            {
+                Vector3D current_adjusted = current;
+
+                if (requireProjection)
+                {
+                    current_adjusted = ProjectPointOnPlane(axisOfRotation, Vector3D.Zero, current);
+                }
+
+                double angle = Math.Acos(MathHelper.Clamp(target.Dot(current_adjusted), -1, 1));
+                Vector3D cross = target.Cross(current_adjusted);
+                if (axisOfRotation.Dot(cross) < 0)
+                {
+                    angle = -angle;
+                }
+
+                return angle;
+            }
+
             public static double VectorAngleBetween(Vector3D a, Vector3D b) //returns radians 
             {
                 if (a.LengthSquared() == 0 || b.LengthSquared() == 0)

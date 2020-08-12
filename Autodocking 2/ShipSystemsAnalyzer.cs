@@ -47,6 +47,9 @@ namespace IngameScript
             public Dictionary<Base6Directions.Direction, ThrusterGroup> thrusterGroups;
 
             public List<IMyThrust> thrusters = new List<IMyThrust>();
+            double off_thrusters_count = 0;
+
+
             public ThrusterGroup UpThrust;
 
 
@@ -310,7 +313,13 @@ namespace IngameScript
                     if (firstTime)
                     {
                         parent_program.shipIOHandler.Echo("Waiting for orders, " + parent_program.your_title + ".\n");
+                        if (!parent_program.extra_info)
+                        {
+                            parent_program.shipIOHandler.Echo("Ready for Waypoints.\n");
+                        }
+                        
                         if (antenna_result != "") parent_program.shipIOHandler.Echo(antenna_result);
+                        
                         if (parent_program.extra_info)
                         {
                             if (shipMass != 0) parent_program.shipIOHandler.Echo("Mass: " + shipMass);
@@ -355,6 +364,13 @@ namespace IngameScript
                 foreach (var block in parent_program.blocks)
                     if (block is IMyThrust && block.IsWorking && blockIsOnMyGrid(block))
                         o_thrusters.Add((IMyThrust) block);
+                    else if (block is IMyThrust)
+                    {
+                        if (!((IMyThrust)block).Enabled && blockIsOnMyGrid(block))
+                        {
+                            off_thrusters_count += 1;
+                        }
+                    }
                 return o_thrusters;
             }
 
@@ -382,8 +398,8 @@ namespace IngameScript
                 var found_connected_connector = false;
                 var found_connectable_connector = false;
                 foreach (var connector in Connectors)
-                    if (cockpit.CubeGrid.ToString() == connector.CubeGrid.ToString() &&
-                        !connector.CustomName.ToLower().Contains("[recall dock]"))
+                    if ((cockpit.CubeGrid.ToString() == connector.CubeGrid.ToString() &&
+                        !connector.CustomName.ToLower().Contains("[recall dock]") && !parent_program.allow_connector_on_seperate_grid) || (parent_program.allow_connector_on_seperate_grid && connector.CustomName.ToLower().Contains("[dock]")))
                     {
                         if (connector.Status == MyShipConnectorStatus.Connected)
                         {
@@ -526,27 +542,44 @@ namespace IngameScript
                         }
                     }
 
+                string err_string = "";
                 if (unusedDirections.Count == 6)
                 {
-                    parent_program.shipIOHandler.Error("Sorry " + parent_program.your_title +
-                                                       ", I couldn't seem to find any thrusters on your ship.");
+                    err_string = "Sorry " + parent_program.your_title + ", I couldn't seem to find any thrusters on your ship.";
+                    if (off_thrusters_count > 0)
+                    {
+                        err_string += "\nI have detected that some thrusters\nare disabled. Could this be the problem?";
+                    }
+                    parent_program.shipIOHandler.Error(err_string);
                 }
                 else if (unusedDirections.Count == 1)
                 {
-                    parent_program.shipIOHandler.Error("Sorry " + parent_program.your_title +
-                                                       ", it's required that all 6 directions have at least one thruster.\nThe missing direction might be " +
-                                                       unusedDirections[0] + "."); //
+                    err_string = "Sorry " + parent_program.your_title +
+                                 ", it's required that all 6 directions have at least one thruster.\nThe missing direction might be " +
+                                 unusedDirections[0] + ".";
+                    if (off_thrusters_count > 0)
+                    {
+                        err_string += "\nI have detected that some thrusters\nare disabled. Could this be the problem?";
+                    }
+                    parent_program.shipIOHandler.Error(err_string); //
                 }
                 else if (unusedDirections.Count > 1)
                 {
                     var total_string = "";
                     foreach (var di in unusedDirections) total_string += di + "-";
 
+                    err_string = "Sorry " + parent_program.your_title +
+                                 ", it's required that all 6 directions have at least one thruster.\nIt seems the missing directions might be: " +
+                                 total_string;
+                    if (off_thrusters_count > 0)
+                    {
+                        err_string += "\nI have detected that some thrusters\nare disabled. Could this be the problem?";
+                    }
 
-                    parent_program.shipIOHandler.Error("Sorry " + parent_program.your_title +
-                                                       ", it's required that all 6 directions have at least one thruster.\nIt seems the missing directions might be: " +
-                                                       total_string); // 
+                    parent_program.shipIOHandler.Error(err_string); // 
                 }
+
+
             }
 
             public void UpdateThrusterGroupsWorldDirections()

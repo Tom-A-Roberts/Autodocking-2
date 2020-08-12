@@ -101,6 +101,19 @@ namespace IngameScript
                                 timer.Trigger();
             }
 
+
+            public void WaypointEcho(string arg, int count, string extra_output)
+            {
+                if (count == 0)
+                {
+                    Echo("RECORDING MODE\nRecording to argument: " + ConvertArg(arg) + ".\nPressing Run will record\nposition and rotation. To finish, press Run when docked.\n\nTo cancel, press Recompile.");
+                }
+                else
+                {
+                    Echo("RECORDING MODE\nRecorded " + count + " waypoints to argument: " + ConvertArg(arg) + extra_output + "\nPressing Run will record position and rotation again. To finish, press Run when docked.\n\nTo cancel, press Recompile.");
+                }
+            }
+
             /// <summary>
             ///     This will output the accumulated Echo line to the user.<br />
             ///     The bool parameter defines where the output will be:<br />
@@ -115,6 +128,9 @@ namespace IngameScript
                     if (parent_program.runningIssues.Length > 0) parent_program.runningIssues += "\n";
                     var echoString = "= Spug's Auto Docking 2.0 =\n\n" + parent_program.runningIssues + echoLine;
                     parent_program.Echo(echoString);
+                    //parent_program.Me.GetSurface(0).ContentType = ContentType.TEXT_AND_IMAGE;
+                    //parent_program.Me.GetSurface(0).WriteText(echoString);
+
                     if (!OnlyInProgrammingBlock && output_LCDs.Count > 0)
                         foreach (var surface in output_LCDs)
                             if (surface != null)
