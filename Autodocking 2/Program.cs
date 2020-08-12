@@ -28,11 +28,14 @@ namespace IngameScript
         double topSpeed = 100;                                         // The top speed the ship will go in m/s.
 
         bool extra_soft_landing_mode = false;                 // If your ship is hitting your connector too hard, enable this.
-        double connector_clearance = 0;                          // If you raise this number (measured in meters), the ship will fly auxilleryDirection higher before coming down onto the connector.
+        double connector_clearance = 0;                          // If you raise this number (measured in meters), the ship will fly connector_clearance higher before coming down onto the connector.
+        double add_acceleration = 0;                                // If your ship is accelerating very slow, or perhaps stopping at a low top speed, try raising this (e.g to 10).
+
 
         bool enable_antenna_function = true;                   //If enabled, the ship will try to search for an optional home script. Disable if the antenna functionality is giving you problems.
 
         bool allow_connector_on_seperate_grid = false; // WARNING: All connectors on your ship must have [dock] in the name if you set this to true! This option allows your connector to not be on the same grid.
+
 
         // Waypoint settings:
         double required_waypoint_accuracy = 6;             // how close the ship needs to be to a waypoint to complete it (measured in meters). Do note, closer waypoints are more accurate anyway.
@@ -332,11 +335,20 @@ namespace IngameScript
         /// <summary>Begins the ship docking sequence. Requires (Will require) a HomeLocation and argument.</summary>
         /// <param name="beginConnector"></param>
         /// <param name="argument"></param>
-        public void Begin(string argument) // WARNING, NEED TO ADD HOME LOCATION IN FUTURE INSTEAD
+        /// /// <param name="connectorOverride">override the ship connector used to dock</param>
+        public void Begin(string argument, IMyShipConnector connectorOverride = null) // WARNING, NEED TO ADD HOME LOCATION IN FUTURE INSTEAD
         {
             systemsAnalyzer.currentHomeLocation = FindHomeLocation(argument);
             if (systemsAnalyzer.currentHomeLocation != null)
             {
+                if (connectorOverride != null)
+                {
+                    systemsAnalyzer.currentHomeLocation.shipConnector = connectorOverride;
+                    systemsAnalyzer.currentHomeLocation.shipConnectorID = connectorOverride.EntityId;
+                }
+
+                Me.CustomData = systemsAnalyzer.currentHomeLocation.shipConnector.EntityId.ToString();
+
                 systemsAnalyzer.currentHomeLocation.stationVelocity = Vector3D.Zero;
                 systemsAnalyzer.currentHomeLocation.stationAcceleration = Vector3D.Zero;
                 systemsAnalyzer.currentHomeLocation.stationAngularVelocity = Vector3D.Zero;
@@ -648,6 +660,8 @@ namespace IngameScript
             }
         }
 
+
+
         public void ClearMemoryLocation(string argument)
         {
             //Check if any homelocations had that argument before, if so, remove it.
@@ -698,6 +712,63 @@ namespace IngameScript
             return o_string;
         }
 
+        public IMyShipConnector CheckForConnectorOverride(ref string argument)
+        {
+            if (argument.Contains("!"))
+            {
+                string[] arg_split = argument.Trim().Split('!');
+                if (arg_split.Length > 1)
+                {
+                    string afterSeperator = arg_split[1].TrimEnd();
+                    if (afterSeperator.Length > 0)
+                    {
+                        long ID_extracted;
+                        bool success = long.TryParse(afterSeperator, out ID_extracted);
+                        if (success)
+                        {
+                            IMyShipConnector new_connector = (IMyShipConnector)GridTerminalSystem.GetBlockWithId(ID_extracted);
+                            if (new_connector != null)
+                            {
+                                
+                                string resultant_arg = "";
+                                string[] raw_split = argument.Split('!');
+                                for (int i = 0; i < raw_split.Length - 1; i++)
+                                {
+                                    resultant_arg += raw_split[i];
+                                }
+
+                                resultant_arg = resultant_arg.TrimEnd();
+
+                                argument = resultant_arg;
+                                return new_connector;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        public bool checkForReadonly(ref string argument)
+        {
+            if(argument.Length > 1)
+            {
+                if (argument[0] == '!' && argument.Contains(" "))
+                {
+                    string[] arg_split = argument.Split(' ');
+                    if(arg_split.Length > 1)
+                    {
+                        if(arg_split[0].ToLower() == "!readonly")
+                        {
+                            argument = argument.Remove(0, 10);
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
 
         public void Main(string argument, UpdateType updateSource)
         {
@@ -723,7 +794,10 @@ namespace IngameScript
 
                     if (!recording)
                     {
+
+
                         var my_connected_connector = systemsAnalyzer.FindMyConnectedConnector();
+
                         var clear_command = checkForClear(argument);
                         if (argument.ToLower().Trim() == "record")
                         {
@@ -745,9 +819,21 @@ namespace IngameScript
                         {
                             ClearMemoryLocation(clear_command);
                         }
-
                         else
                         {
+                            var connectorOverride = CheckForConnectorOverride(ref argument);
+                            bool user_wants_readonly = checkForReadonly(ref argument);
+
+                            if (user_wants_readonly && my_connected_connector != null)
+                            {
+
+                                    if (my_connected_connector.Status == MyShipConnectorStatus.Connectable)
+                                    {
+                                        my_connected_connector = null;
+                                    }
+                                
+                            }
+
                             if (my_connected_connector == null)
                             {
                                 if (scriptEnabled && argument == current_argument)
@@ -759,15 +845,35 @@ namespace IngameScript
                                 else
                                 {
                                     // Request to dock initialized.
-                                    Begin(argument);
+                                    if (connectorOverride != null)
+                                    {
+                                        Begin(argument, connectorOverride);
+                                    }
+                                    else
+                                    {
+                                        Begin(argument);
+                                    }
+                                    
                                 }
                             }
                             else
                             {
-                                var result = updateHomeLocation(argument, my_connected_connector);
-                                shipIOHandler.Echo(result);
-                                //shipIOHandler.Echo("\nThis location also has\nother arguments associated:");
-                                SafelyExit();
+                                if (!user_wants_readonly)
+                                {
+                                    if (connectorOverride != null)
+                                    {
+                                        my_connected_connector = connectorOverride;
+                                    }
+
+                                    var result = updateHomeLocation(argument, my_connected_connector);
+                                    shipIOHandler.Echo(result);
+                                    //shipIOHandler.Echo("\nThis location also has\nother arguments associated:");
+                                    SafelyExit();
+                                }
+                                else
+                                {
+                                    shipIOHandler.Echo("OVERRIDDEN\nShip save has been overriden\ndue to the !readonly command.");
+                                }
                             }
                         }
                     }
@@ -781,7 +887,12 @@ namespace IngameScript
                         }
                         else
                         {
+                            var connectorOverride = CheckForConnectorOverride(ref argument);
                             var my_connected_connector = systemsAnalyzer.FindMyConnectedConnector();
+                            if (my_connected_connector != null && connectorOverride != null)
+                            {
+                                my_connected_connector = connectorOverride;
+                            }
                             recordWaypoint(my_connected_connector, argument);
                         }
                         
@@ -1227,7 +1338,7 @@ namespace IngameScript
 
             // Finding max forward thrust:
             var LeadVelocity = (CurrentVelocity - systemsAnalyzer.currentHomeLocation.stationVelocity).Length() +
-                               DeltaTime * (waypoint.maximumAcceleration + issueDetection);
+                               DeltaTime * (waypoint.maximumAcceleration + issueDetection + add_acceleration);
             if (LeadVelocity > topSpeedUsed) LeadVelocity = topSpeedUsed;
             var TargetVelocity = TargetDirection * LeadVelocity + systemsAnalyzer.currentHomeLocation.stationVelocity;
             var velocityDifference = CurrentVelocity - TargetVelocity;

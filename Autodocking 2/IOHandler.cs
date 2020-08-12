@@ -128,6 +128,9 @@ namespace IngameScript
                     if (parent_program.runningIssues.Length > 0) parent_program.runningIssues += "\n";
                     var echoString = "= Spug's Auto Docking 2.0 =\n\n" + parent_program.runningIssues + echoLine;
                     parent_program.Echo(echoString);
+                    //parent_program.Me.GetSurface(0).ContentType = ContentType.TEXT_AND_IMAGE;
+                    //parent_program.Me.GetSurface(0).WriteText(echoString);
+
                     if (!OnlyInProgrammingBlock && output_LCDs.Count > 0)
                         foreach (var surface in output_LCDs)
                             if (surface != null)

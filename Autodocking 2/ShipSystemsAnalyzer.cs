@@ -313,7 +313,13 @@ namespace IngameScript
                     if (firstTime)
                     {
                         parent_program.shipIOHandler.Echo("Waiting for orders, " + parent_program.your_title + ".\n");
+                        if (!parent_program.extra_info)
+                        {
+                            parent_program.shipIOHandler.Echo("Ready for Waypoints.\n");
+                        }
+                        
                         if (antenna_result != "") parent_program.shipIOHandler.Echo(antenna_result);
+                        
                         if (parent_program.extra_info)
                         {
                             if (shipMass != 0) parent_program.shipIOHandler.Echo("Mass: " + shipMass);
