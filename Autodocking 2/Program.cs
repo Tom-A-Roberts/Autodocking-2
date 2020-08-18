@@ -87,6 +87,8 @@ namespace IngameScript
         private string current_argument;
 
         private double DeltaTimeReal;
+        private double DeltaTime;
+
         private bool errorState;
         private bool hasConnectionToAntenna;
         private bool lastUpdateWasApproach;
@@ -1074,9 +1076,10 @@ namespace IngameScript
                         sideways_dist_needed_to_land = 5;
                     }
 
-                    var speedDampener = 1 - systemsAnalyzer.currentHomeLocation.stationVelocity.Length() / 100 * 0.2;
+                    var speedDampener = 1 - (systemsAnalyzer.currentHomeLocation.stationVelocity.Length() / (100 * 0.2)); //
+                    //speedDampener = 1;
                     var ConnectorLocation = systemsAnalyzer.currentHomeLocation.stationConnectorPosition +
-                                            DeltaTimeReal * systemsAnalyzer.currentHomeLocation.stationVelocity *
+                                            DeltaTimeReal * systemsAnalyzer.currentHomeLocation.stationVelocity * // CHANGED
                                             speedDampener;
                     var ConnectorDirection = systemsAnalyzer.currentHomeLocation.stationConnectorForward;
                     var ConnectorUp = systemsAnalyzer.currentHomeLocation.stationConnectorUpGlobal;
@@ -1297,7 +1300,7 @@ namespace IngameScript
         private double MoveToWaypoint(Waypoint waypoint)
         {
             //bool tempError = false;
-            var DeltaTime = Runtime.TimeSinceLastRun.TotalSeconds * 10;
+            DeltaTime = Runtime.TimeSinceLastRun.TotalSeconds * 10;
             DeltaTimeReal = (DateTime.Now - previousTime).TotalSeconds;
 
 
