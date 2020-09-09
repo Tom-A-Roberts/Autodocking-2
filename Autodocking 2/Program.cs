@@ -31,11 +31,17 @@ namespace IngameScript
         double connector_clearance = 0;                          // If you raise this number (measured in meters), the ship will fly connector_clearance higher before coming down onto the connector.
         double add_acceleration = 0;                                // If your ship is accelerating very slow, or perhaps stopping at a low top speed, try raising this (e.g to 10).
 
+        string lcd_tag = "[dock]";                                       // The text you can add to an LCD block name. The LCD will then output this block's output
+        string timer_tag = "[dock]";                                   // The text you can add to a timer block name. The timer will then be triggered on a completed dock.
+        bool force_timer_search_on_station = false;       // If enabled, the ship will make sure it always searches the station for [dock] (the timer_tag) in the names of any timer blocks.
+        string start_timer_tag = "[start dock]";                 // A timer with this text in the name will be triggered as soon as a docking procedure is started.
 
         bool enable_antenna_function = true;                   //If enabled, the ship will try to search for an optional home script. Disable if the antenna functionality is giving you problems.
 
         bool allow_connector_on_seperate_grid = false; // WARNING: All connectors on your ship must have [dock] in the name if you set this to true! This option allows your connector to not be on the same grid.
 
+        double high_speed_lead_amount = 1;                  // WARNING: Only change if the ship can't land on high speed ships (over 120 m/s).
+                                                                                      //If this number is less than 1, the ship will fly ahead of the connector more when the connector is moving. This can be a negative number, however try 0 first.
 
         // Waypoint settings:
         double required_waypoint_accuracy = 6;             // how close the ship needs to be to a waypoint to complete it (measured in meters). Do note, closer waypoints are more accurate anyway.
@@ -350,6 +356,8 @@ namespace IngameScript
                 }
 
                 Me.CustomData = systemsAnalyzer.currentHomeLocation.shipConnector.EntityId.ToString();
+
+                shipIOHandler.OutputStartTimer();
 
                 systemsAnalyzer.currentHomeLocation.stationVelocity = Vector3D.Zero;
                 systemsAnalyzer.currentHomeLocation.stationAcceleration = Vector3D.Zero;
@@ -1076,8 +1084,14 @@ namespace IngameScript
                         sideways_dist_needed_to_land = 5;
                     }
 
-                    var speedDampener = 1 - (systemsAnalyzer.currentHomeLocation.stationVelocity.Length() / (100 * 0.2)); //
+                    var speedDampener = 1 - ((systemsAnalyzer.currentHomeLocation.stationVelocity.Length() / 100) * 0.2 * high_speed_lead_amount); //
                     //speedDampener = 1;
+
+                    //shipIOHandler.Echo(DeltaTime);
+                    //shipIOHandler.Echo(DeltaTimeReal);
+                    //shipIOHandler.Echo(systemsAnalyzer.currentHomeLocation.stationVelocity.Length());
+
+
                     var ConnectorLocation = systemsAnalyzer.currentHomeLocation.stationConnectorPosition +
                                             DeltaTimeReal * systemsAnalyzer.currentHomeLocation.stationVelocity * // CHANGED
                                             speedDampener;

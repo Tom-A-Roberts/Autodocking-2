@@ -15,6 +15,7 @@ namespace IngameScript
             private string echoLine = "";
             public List<IMyTextSurface> output_LCDs = new List<IMyTextSurface>();
             public List<IMyTimerBlock> output_timers = new List<IMyTimerBlock>();
+            public List<IMyTimerBlock> output_start_timers = new List<IMyTimerBlock>();
 
             public IOHandler(Program _parent_program)
             {
@@ -33,15 +34,40 @@ namespace IngameScript
 
             public void FindOutputBlocks()
             {
-                output_timers = new List<IMyTimerBlock>();
-                output_LCDs = new List<IMyTextSurface>();
-                foreach (var block in parent_program.blocks)
+                output_start_timers = new List<IMyTimerBlock>();
+                if (parent_program.force_timer_search_on_station)
                 {
-                    if (block is IMyTimerBlock && block.CustomName.ToLower().Contains("[dock]") &&
-                        blockIsOnMyGrid(block)) output_timers.Add((IMyTimerBlock) block);
-                    if (block is IMyTextSurface && block.CustomName.ToLower().Contains("[dock]") &&
-                        blockIsOnMyGrid(block)) output_LCDs.Add((IMyTextSurface) block);
+                    List<IMyTerminalBlock> t_search_blocks = new List<IMyTerminalBlock>();
+                    parent_program.GridTerminalSystem.GetBlocks(t_search_blocks);
+                    output_timers = new List<IMyTimerBlock>();
+
+                    output_LCDs = new List<IMyTextSurface>();
+                    foreach (var block in t_search_blocks)
+                    {
+                        if (block is IMyTimerBlock && block.CustomName.ToLower().Contains(parent_program.timer_tag))
+                            output_timers.Add((IMyTimerBlock)block);
+                        if (block is IMyTextSurface && block.CustomName.ToLower().Contains(parent_program.lcd_tag))
+                            output_LCDs.Add((IMyTextSurface)block);
+                        if (block is IMyTimerBlock && block.CustomName.ToLower().Contains(parent_program.start_timer_tag) && blockIsOnMyGrid(block))
+                            output_start_timers.Add((IMyTimerBlock)block);
+                    }
                 }
+                //
+                else
+                {
+                    output_timers = new List<IMyTimerBlock>();
+                    output_LCDs = new List<IMyTextSurface>();
+                    foreach (var block in parent_program.blocks)
+                    {
+                        if (block is IMyTimerBlock && block.CustomName.ToLower().Contains(parent_program.timer_tag) && blockIsOnMyGrid(block))
+                            output_timers.Add((IMyTimerBlock)block);
+                        if (block is IMyTextSurface && block.CustomName.ToLower().Contains(parent_program.lcd_tag) && blockIsOnMyGrid(block))
+                            output_LCDs.Add((IMyTextSurface)block);
+                        if (block is IMyTimerBlock && block.CustomName.ToLower().Contains(parent_program.start_timer_tag) && blockIsOnMyGrid(block))
+                            output_start_timers.Add((IMyTimerBlock)block);
+                    }
+                }
+
             }
 
             public bool blockIsOnMyGrid(IMyTerminalBlock block)
@@ -94,8 +120,20 @@ namespace IngameScript
 
             public void OutputTimer()
             {
+                if (parent_program.force_timer_search_on_station)
+                {
+                    FindOutputBlocks();
+                }
                 if (output_timers.Count > 0)
                     foreach (var timer in output_timers)
+                        if (timer != null)
+                            if (timer.IsWorking)
+                                timer.Trigger();
+            }
+            public void OutputStartTimer()
+            {
+                if (output_start_timers.Count > 0)
+                    foreach (var timer in output_start_timers)
                         if (timer != null)
                             if (timer.IsWorking)
                                 timer.Trigger();
