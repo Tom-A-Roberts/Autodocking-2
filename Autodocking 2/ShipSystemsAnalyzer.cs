@@ -47,6 +47,7 @@ namespace IngameScript
             public Dictionary<Base6Directions.Direction, ThrusterGroup> thrusterGroups;
 
             public List<IMyThrust> thrusters = new List<IMyThrust>();
+            
             double off_thrusters_count = 0;
 
 
@@ -383,6 +384,15 @@ namespace IngameScript
                 return o_gyros;
             }
 
+
+            public void FindParentStationConnectors()
+            {
+
+
+                // Go through all home locations, and change the parent grid ID's
+            }
+
+            
             /// <summary>
             ///     When called, the ship will look through it's grid (And in-turn, it's connected grid) to find what connector
             ///     the ship is connected to.<br />More specifically, it looks for a connector that is part of the cockpit's grid and
@@ -392,7 +402,7 @@ namespace IngameScript
             public IMyShipConnector FindMyConnectedConnector()
             {
                 IMyShipConnector output = null;
-                var Connectors = new List<IMyShipConnector>();
+                List<IMyShipConnector> Connectors = new List<IMyShipConnector>();
                 parent_program.GridTerminalSystem.GetBlocksOfType(Connectors);
 
                 var found_connected_connector = false;

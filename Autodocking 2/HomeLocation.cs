@@ -21,11 +21,11 @@ namespace IngameScript
 
 
             public IMyShipConnector shipConnector;
-            public long shipConnectorID; // myConnector.EntityId;
+            public int shipConnectorID;
             public Vector3D stationAcceleration = Vector3D.Zero;
             public Vector3D stationAngularVelocity = Vector3D.Zero;
             public Vector3D stationConnectorForward;
-            public long stationConnectorID;
+            public int stationConnectorID;
             public Vector3D stationConnectorLeft;
             public Vector3D stationConnectorPosition;
 
@@ -160,8 +160,8 @@ namespace IngameScript
                 var data_parts = saved_data_string.Split(main_delimeter);
                 if (data_parts.Length == 8)
                 {
-                    long.TryParse(data_parts[0], out shipConnectorID);
-                    long.TryParse(data_parts[1], out stationConnectorID);
+                    int.TryParse(data_parts[0], out shipConnectorID);
+                    int.TryParse(data_parts[1], out stationConnectorID);
                     Vector3D.TryParse(data_parts[2], out stationConnectorPosition);
                     Vector3D.TryParse(data_parts[3], out stationConnectorForward);
                     Vector3D.TryParse(data_parts[4], out stationConnectorUpGlobal);
@@ -173,8 +173,8 @@ namespace IngameScript
                 }
                 else if (data_parts.Length == 12)
                 {
-                    long.TryParse(data_parts[0], out shipConnectorID);
-                    long.TryParse(data_parts[1], out stationConnectorID);
+                    int.TryParse(data_parts[0], out shipConnectorID);
+                    int.TryParse(data_parts[1], out stationConnectorID);
                     Vector3D.TryParse(data_parts[2], out stationConnectorPosition);
                     Vector3D.TryParse(data_parts[3], out stationConnectorForward);
                     Vector3D.TryParse(data_parts[4], out stationConnectorUpGlobal);
@@ -265,9 +265,16 @@ namespace IngameScript
             /// <param name="station_connector"></param>
             public void UpdateData(IMyShipConnector my_connector, IMyShipConnector station_connector)
             {
-                shipConnectorID = my_connector.EntityId;
+                shipConnectorID = GetConnectorID(my_connector);
+                stationConnectorID = GetConnectorID(station_connector);
+
+
+
+
+                stationGridID = station_connector.CubeGrid.EntityId;
+
                 shipConnector = my_connector;
-                stationConnectorID = station_connector.EntityId;
+                
                 stationConnectorPosition = station_connector.GetPosition();
                 stationConnectorForward = station_connector.WorldMatrix.Forward;
                 stationConnectorLeft = station_connector.WorldMatrix.Left;
@@ -282,9 +289,10 @@ namespace IngameScript
                 stationConnectorUpLocal = worldDirectionToLocalDirection(stationConnectorUpGlobal, station_connector.WorldMatrix);
 
 
-                stationGridID = station_connector.CubeGrid.EntityId;
+                
                 stationConnectorSize = ShipSystemsAnalyzer.GetRadiusOfConnector(station_connector);
             }
+            
 
             public static Vector3D worldDirectionToLocalDirection(Vector3D world_direction, MatrixD world_matrix)
             {
@@ -329,7 +337,31 @@ namespace IngameScript
 
             public void UpdateShipConnectorUsingID(Program parent_program)
             {
-                shipConnector = (IMyShipConnector) parent_program.GridTerminalSystem.GetBlockWithId(shipConnectorID);
+                //shipConnector = (IMyShipConnector) parent_program.GridTerminalSystem.GetBlockWithId(shipConnectorID);
+                List<IMyShipConnector> Connectors = new List<IMyShipConnector>();
+                parent_program.GridTerminalSystem.GetBlocksOfType(Connectors);
+
+                parent_program.Echo("Here");
+
+                foreach (IMyTerminalBlock connector in parent_program.blocks)
+                {
+                    
+                    //if (blockIsOnMyGrid(connector, parent_program))
+                    //{
+                        if(connector is IMyShipConnector)
+                        {
+                            int conn_ID = GetConnectorID((IMyShipConnector)connector);
+                            parent_program.Echo(conn_ID.ToString());
+                            if (conn_ID == shipConnectorID)
+                            {
+                                shipConnector = (IMyShipConnector)connector;
+                                parent_program.Echo("Success");
+                                break;
+                            }
+                        }
+                    //}
+                }
+
             }
 
             public string UpdateDataFromOptionalHomeScript(string[] data_parts)
@@ -361,6 +393,10 @@ namespace IngameScript
                 }
 
                 return issuestring;
+            }
+            public bool blockIsOnMyGrid(IMyTerminalBlock block, Program parent_program)
+            {
+                return block.CubeGrid.EntityId == parent_program.Me.CubeGrid.EntityId;
             }
 
             /// <summary>
@@ -394,6 +430,23 @@ namespace IngameScript
                 // hashCode = hashCode * -1521134295 + EqualityComparer<Vector3D>.Default.GetHashCode (station_connector_up);
                 return hashCode;
             }
+
+            public static int GetConnectorID(IMyShipConnector connector)
+            {
+                //long hashCode = -48822951;
+                //hashCode = hashCode * -1321134235 + connector.Orientation.GetHashCode();
+                ////hashCode = hashCode * -1321134235 + connector.NumberInGrid;
+                //hashCode = hashCode * -1221144235 + connector.Position.GetHashCode();
+
+                int hashCode = connector.Position.X + connector.Position.Y + connector.Position.Z;
+
+
+
+
+
+                return hashCode;
+            }
+
         }
     }
 }

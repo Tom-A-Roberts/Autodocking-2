@@ -131,8 +131,20 @@ namespace IngameScript
 
             shipIOHandler = new IOHandler(this);
 
-            if (Storage.Length > 0)
+            if(Storage.Length > 1)
+            {
+                Me.CustomData = Storage;
+            }
+
+            if (Me.CustomData.Length > 1)
                 RetrieveStorage();
+
+
+            if (homeLocations.Count > 0)
+            {
+                shipIOHandler.Echo(homeLocations[0].shipConnectorID);
+            }
+
 
             antennaHandler = new AntennaHandler(this);
             systemsAnalyzer = new ShipSystemsAnalyzer(this);
@@ -143,6 +155,14 @@ namespace IngameScript
             rollPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
             yawPID = new PID(proportionalConstant, 0, derivativeConstant, -10, 10, timeLimit);
 
+            if(Storage.Length < 2 && Me.CustomData.Length > 1)
+            {
+                systemsAnalyzer.FindParentStationConnectors();
+            }
+
+
+
+            
             timeElapsed = 0;
             timeElapsedSinceAntennaCheck = 0;
             SafelyExit();
@@ -152,7 +172,7 @@ namespace IngameScript
         {
             //Data 
 
-            var two_halves = Storage.Split('#');
+            var two_halves = Me.CustomData.Split('#');
             //if (copy_paste_persistant_memory)
             //    two_halves = Me.CustomData.Split('#');
 
@@ -164,6 +184,8 @@ namespace IngameScript
                     var newLoc = new HomeLocation(dataItem, this);
                     if (newLoc.shipConnector != null) homeLocations.Add(newLoc);
                 }
+
+
         }
 
         //Help from Whip.
@@ -314,11 +336,12 @@ namespace IngameScript
         public void Save()
         {
             produceDataString();
+            Storage = Me.CustomData;
         }
 
         public void produceDataString()
         {
-            Storage = "";
+            Me.CustomData = "";
             //if (copy_paste_persistant_memory)
             //    Me.CustomData = "";
             //Data 
@@ -335,7 +358,7 @@ namespace IngameScript
 
         public void AppendToStorage(string data)
         {
-            Storage += data;
+            Me.CustomData += data;
             //if (copy_paste_persistant_memory)
             //    Me.CustomData += data;
         }
@@ -352,10 +375,11 @@ namespace IngameScript
                 if (connectorOverride != null)
                 {
                     systemsAnalyzer.currentHomeLocation.shipConnector = connectorOverride;
-                    systemsAnalyzer.currentHomeLocation.shipConnectorID = connectorOverride.EntityId;
+
+                    systemsAnalyzer.currentHomeLocation.shipConnectorID = HomeLocation.GetConnectorID(connectorOverride);
                 }
 
-                Me.CustomData = systemsAnalyzer.currentHomeLocation.shipConnector.EntityId.ToString();
+                
 
                 shipIOHandler.OutputStartTimer();
 
