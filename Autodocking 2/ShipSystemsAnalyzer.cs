@@ -403,6 +403,7 @@ namespace IngameScript
                     {
                         if (connector.Status == MyShipConnectorStatus.Connected)
                         {
+
                             if (!found_connected_connector)
                             {
                                 found_connected_connector = true;
