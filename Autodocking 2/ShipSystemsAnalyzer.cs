@@ -343,7 +343,7 @@ namespace IngameScript
             /// <returns>bool</returns>
             public bool blockIsOnMyGrid(IMyTerminalBlock block)
             {
-                return block.CubeGrid.EntityId == parent_program.Me.CubeGrid.EntityId;
+                return block.IsSameConstructAs(parent_program.Me);
             }
 
             public static double GetRadiusOfConnector(IMyShipConnector con)
@@ -398,7 +398,7 @@ namespace IngameScript
                 var found_connected_connector = false;
                 var found_connectable_connector = false;
                 foreach (var connector in Connectors)
-                    if ((cockpit.CubeGrid.ToString() == connector.CubeGrid.ToString() &&
+                    if ((cockpit.IsSameConstructAs(connector) &&
                         !connector.CustomName.ToLower().Contains("[recall dock]") && !parent_program.allow_connector_on_seperate_grid) || (parent_program.allow_connector_on_seperate_grid && connector.CustomName.ToLower().Contains("[dock]")))
                     {
                         if (connector.Status == MyShipConnectorStatus.Connected)
