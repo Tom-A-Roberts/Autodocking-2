@@ -72,7 +72,7 @@ namespace IngameScript
 
             public bool blockIsOnMyGrid(IMyTerminalBlock block)
             {
-                return block.CubeGrid.EntityId == parent_program.Me.CubeGrid.EntityId;
+                return block.IsSameConstructAs(parent_program.Me);
             }
 
             /// <summary>
